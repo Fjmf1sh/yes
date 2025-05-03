@@ -42,8 +42,8 @@
 <body>
   <div class="box">
     <h1>🎮 Welcome to F1shCraft!</h1>
-    <div class="ip">IPs: <code>mc.fjmf1sh.click</code> & <code>create.fjmf1sh.click</code></div>
-    <p>Join survival and creative worlds with custom plugins and chill vibes.</p>
+    <div class="ip">IP: <code>mc.fjmf1sh.click</code></div>
+    <p>Join our survival & create worlds with custom plugins and chill vibes.</p>
     <p id="status" class="status">Checking status...</p>
     <p>Version: <strong>1.8.9 – 1.21.5</strong></p>
     <p>Use Minecraft Java Edition to join.</p>
@@ -63,7 +63,7 @@
     async function updateStatus() {
       const statusEl = document.getElementById('status');
       const main = await fetchPlayers('mc.fjmf1sh.click');
-      const create = await fetchPlayers('create.fjmf1sh.click');
+      const create = await fetchPlayers('104.34.2.134:25566'); // direct IP bypassing SRV
       const total = main + create;
 
       if (main || create) {
