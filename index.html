@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>F1shCraft - Minecraft Server</title>
+  <style>
+    body {
+      background-color: #0a0a0a;
+      background-image: radial-gradient(#ff4444 1px, transparent 1px);
+      background-size: 20px 20px;
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      padding: 3em;
+      margin: 0;
+    }
+    .box {
+      background: rgba(0, 0, 0, 0.8);
+      padding: 2em;
+      border-radius: 15px;
+      max-width: 500px;
+      margin: auto;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+    }
+    h1 {
+      color: #ff4444;
+      margin-bottom: 0.5em;
+    }
+    .ip {
+      font-size: 1.4em;
+      font-weight: bold;
+      margin-bottom: 1em;
+    }
+    .status {
+      margin-top: 1em;
+      font-size: 1.1em;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>🎮 Welcome to F1shCraft!</h1>
+    <div class="ip">IP: <code>mc.fjmf1sh.click</code></div>
+    <p>Join our survival server with custom plugins, events, and chill vibes.</p>
+    <p id="status" class="status">Checking status...</p>
+    <p>Version: <strong>1.8.9 – 1.21.5</strong></p>
+    <p>Use Minecraft Java Edition to join.</p>
+  </div>
+
+  <script>
+    async function fetchPlayers(server) {
+      try {
+        const res = await fetch(`https://api.mcstatus.io/v2/status/java/${server}`);
+        const data = await res.json();
+        return data.online ? data.players.online : 0;
+      } catch {
+        return 0;
+      }
+    }
+
+    async function updateStatus() {
+      const statusEl = document.getElementById('status');
+      const main = await fetchPlayers('mc.fjmf1sh.click');
+      const create = await fetchPlayers('create.fjmf1sh.click');
+      const total = main + create;
+
+      if (main || create) {
+        statusEl.textContent = `Status: Online ✅ ${total} player${total !== 1 ? 's' : ''} online`;
+        statusEl.style.color = '#0f0';
+      } else {
+        statusEl.textContent = 'Status: Offline ❌';
+        statusEl.style.color = '#f33';
+      }
+    }
+
+    updateStatus();
+  </script>
+</body>
+</html>
