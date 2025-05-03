@@ -42,30 +42,40 @@
 <body>
   <div class="box">
     <h1>🎮 Welcome to F1shCraft!</h1>
-    <div class="ip">IP: <code>mc.fjmf1sh.click</code></div>
-    <p>Join our survival server with custom plugins, events, and chill vibes.</p>
+    <div class="ip">IPs: <code>mc.fjmf1sh.click</code> & <code>create.fjmf1sh.click</code></div>
+    <p>Join survival and creative worlds with custom plugins and chill vibes.</p>
     <p id="status" class="status">Checking status...</p>
     <p>Version: <strong>1.8.9 – 1.21.5</strong></p>
     <p>Use Minecraft Java Edition to join.</p>
   </div>
 
   <script>
-    fetch('https://api.mcstatus.io/v2/status/java/mc.fjmf1sh.click')
-      .then(res => res.json())
-      .then(data => {
-        const status = document.getElementById('status');
-        if (data.online) {
-          status.textContent = `Status: Online ✅ ${data.players.online} player${data.players.online !== 1 ? 's' : ''} online`;
-          status.style.color = '#0f0';
-        } else {
-          status.textContent = 'Status: Offline ❌';
-          status.style.color = '#f33';
-        }
-      })
-      .catch(() => {
-        document.getElementById('status').textContent = 'Status: Unknown ❓';
-      });
+    async function fetchPlayers(server) {
+      try {
+        const res = await fetch(`https://api.mcstatus.io/v2/status/java/${server}`);
+        const data = await res.json();
+        return data.online ? data.players.online : 0;
+      } catch {
+        return 0;
+      }
+    }
+
+    async function updateStatus() {
+      const statusEl = document.getElementById('status');
+      const main = await fetchPlayers('mc.fjmf1sh.click');
+      const create = await fetchPlayers('create.fjmf1sh.click');
+      const total = main + create;
+
+      if (main || create) {
+        statusEl.textContent = `Status: Online ✅ ${total} player${total !== 1 ? 's' : ''} online`;
+        statusEl.style.color = '#0f0';
+      } else {
+        statusEl.textContent = 'Status: Offline ❌';
+        statusEl.style.color = '#f33';
+      }
+    }
+
+    updateStatus();
   </script>
 </body>
 </html>
-
