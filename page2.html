@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>F1shHub</title>
+  <title>F1shCraft - Minecraft Server</title>
   <style>
     body {
       background-color: #0a0a0a;
@@ -25,32 +25,46 @@
     }
     h1 {
       color: #ff4444;
+      margin-bottom: 0.5em;
+    }
+    .ip {
+      font-size: 1.4em;
+      font-weight: bold;
       margin-bottom: 1em;
     }
-    .nav a {
-      display: block;
-      background-color: #222;
-      margin: 1em 0;
-      padding: 1em;
-      border-radius: 10px;
-      color: white;
-      text-decoration: none;
-      font-size: 1.2em;
-      transition: background-color 0.3s;
-      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
-    }
-    .nav a:hover {
-      background-color: #ff4444;
+    .status {
+      margin-top: 1em;
+      font-size: 1.1em;
+      color: #aaa;
     }
   </style>
 </head>
 <body>
   <div class="box">
-    <h1>🧭 F1shHub</h1>
-    <div class="nav">
-      <a href="page1.html">🍪 Play Cookie Clicker</a>
-      <a href="page2.html">🎮 View F1shCraft Server</a>
-    </div>
+    <h1>🎮 Welcome to F1shCraft!</h1>
+    <div class="ip">IP: <code>mc.fjmf1sh.click</code></div>
+    <p>Join our survival server with custom plugins, events, and chill vibes.</p>
+    <p id="status" class="status">Checking status...</p>
+    <p>Version: <strong>1.8.9 – 1.21.5</strong></p>
+    <p>Use Minecraft Java Edition to join.</p>
   </div>
+
+  <script>
+    fetch('https://api.mcstatus.io/v2/status/java/mc.fjmf1sh.click')
+      .then(res => res.json())
+      .then(data => {
+        const status = document.getElementById('status');
+        if (data.online) {
+          status.textContent = `Status: Online ✅ ${data.players.online} player${data.players.online !== 1 ? 's' : ''} online`;
+          status.style.color = '#0f0';
+        } else {
+          status.textContent = 'Status: Offline ❌';
+          status.style.color = '#f33';
+        }
+      })
+      .catch(() => {
+        document.getElementById('status').textContent = 'Status: Unknown ❓';
+      });
+  </script>
 </body>
 </html>
