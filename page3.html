@@ -31,25 +31,18 @@
     }
 
     button {
-      flex: 1 1 45%;
-      background: #333;
+      flex: 1 1 100%;
+      background: #3a3a3a;
       color: white;
       border: none;
       padding: 0.75rem;
       font-size: 1rem;
       border-radius: 6px;
-      min-width: 130px;
       cursor: pointer;
     }
 
     button:hover {
       background: #555;
-    }
-
-    @media (max-width: 600px) {
-      button {
-        flex: 1 1 100%;
-      }
     }
 
     pre {
@@ -69,22 +62,10 @@
   <h1>Multi Cipher Tool</h1>
 
   <label for="message">Message:</label>
-  <textarea id="message" rows="4" placeholder="Enter your message here..."></textarea>
-
-  <label for="shift">Caesar Cipher Shift (0–26):</label>
-  <input type="number" id="shift" min="0" max="26" value="3">
+  <textarea id="message" rows="4" placeholder="Enter your message here...">This is - .... .. ... / -.-. --- -. ..-. . ... ... .. --- -. / .-- .- ...  If wshulzxbpyl</textarea>
 
   <div class="button-grid">
-    <button onclick="encrypt()">Caesar Encrypt</button>
-    <button onclick="decrypt()">Caesar Decrypt</button>
-    <button onclick="bruteForceEncrypt()">Brute Force Caesar Encrypt</button>
-    <button onclick="bruteForceDecrypt()">Brute Force Caesar Decrypt</button>
-    <button onclick="encodeBase64()">Base64 Encrypt</button>
-    <button onclick="decodeBase64()">Base64 Decrypt</button>
-    <button onclick="encodeBase32()">Base32 Encrypt</button>
-    <button onclick="decodeBase32()">Base32 Decrypt</button>
-    <button onclick="encodeMorse()">Morse Encrypt</button>
-    <button onclick="decodeMorse()">Morse Decrypt</button>
+    <button onclick="analyzeAndDecrypt()">🔍 Analyze & Decrypt</button>
     <button onclick="playMorse()">🔊 Play Morse</button>
   </div>
 
@@ -95,156 +76,59 @@
   <pre id="brute-output"></pre>
 
   <script>
-    function caesar(str, shift, mode) {
-      let result = '';
-      for (let i = 0; i < str.length; i++) {
-        let char = str[i];
-        if (char.match(/[a-z]/i)) {
-          let code = str.charCodeAt(i);
-          let base = code >= 65 && code <= 90 ? 65 : 97;
-          if (mode === "encrypt") {
-            char = String.fromCharCode((code - base + shift) % 26 + base);
-          } else {
-            char = String.fromCharCode((code - base - shift + 26) % 26 + base);
-          }
-        }
-        result += char;
-      }
-      return result;
-    }
-
-    function encrypt() {
-      const text = document.getElementById('message').value;
-      const shift = parseInt(document.getElementById('shift').value);
-      document.getElementById('result').value = caesar(text, shift, "encrypt");
-      document.getElementById('brute-output').textContent = "";
-    }
-
-    function decrypt() {
-      const text = document.getElementById('message').value;
-      const shift = parseInt(document.getElementById('shift').value);
-      document.getElementById('result').value = caesar(text, shift, "decrypt");
-      document.getElementById('brute-output').textContent = "";
-    }
-
-    function bruteForceDecrypt() {
-      const text = document.getElementById('message').value;
-      let output = "";
-      for (let shift = 1; shift < 26; shift++) {
-        const result = caesar(text, shift, "decrypt");
-        output += `Shift ${shift}: ${result}\n`;
-      }
-      document.getElementById('brute-output').textContent = output;
-      document.getElementById('result').value = "";
-    }
-
-    function bruteForceEncrypt() {
-      const text = document.getElementById('message').value;
-      let output = "";
-      for (let shift = 1; shift < 26; shift++) {
-        const result = caesar(text, shift, "encrypt");
-        output += `Shift ${shift}: ${result}\n`;
-      }
-      document.getElementById('brute-output').textContent = output;
-      document.getElementById('result').value = "";
-    }
-
-    function encodeBase64() {
-      const text = document.getElementById('message').value;
-      document.getElementById('result').value = btoa(text);
-      document.getElementById('brute-output').textContent = "";
-    }
-
-    function decodeBase64() {
-      const text = document.getElementById('message').value;
-      try {
-        const decoded = atob(text);
-        document.getElementById('result').value = decoded;
-      } catch {
-        document.getElementById('result').value = "Invalid Base64 input.";
-      }
-    }
-
-    function encodeBase32() {
-      const base32chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-      let input = document.getElementById('message').value;
-      let bits = "", output = "";
-
-      for (let i = 0; i < input.length; i++) {
-        bits += input.charCodeAt(i).toString(2).padStart(8, '0');
-      }
-      for (let i = 0; i < bits.length; i += 5) {
-        let chunk = bits.substring(i, i + 5);
-        if (chunk.length < 5) chunk = chunk.padEnd(5, '0');
-        output += base32chars[parseInt(chunk, 2)];
-      }
-      document.getElementById('result').value = output;
-      document.getElementById('brute-output').textContent = "";
-    }
-
-    function decodeBase32() {
-      const base32chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-      const input = document.getElementById('message').value.replace(/=+$/, '').toUpperCase().replace(/[^A-Z2-7]/g, '');
-      let bits = "", output = "";
-
-      for (let i = 0; i < input.length; i++) {
-        let val = base32chars.indexOf(input[i]);
-        if (val === -1) continue;
-        bits += val.toString(2).padStart(5, '0');
-      }
-      for (let i = 0; i + 8 <= bits.length; i += 8) {
-        output += String.fromCharCode(parseInt(bits.substring(i, i + 8), 2));
-      }
-
-      document.getElementById('result').value = output || "Invalid Base32 input.";
-    }
-
-    function encodeMorse() {
+    function decodeMorse(text) {
       const morseCode = {
-        "A": ".-", "B": "-...", "C": "-.-.", "D": "-..", "E": ".", "F": "..-.",
-        "G": "--.", "H": "....", "I": "..", "J": ".---", "K": "-.-", "L": ".-..",
-        "M": "--", "N": "-.", "O": "---", "P": ".--.", "Q": "--.-", "R": ".-.",
-        "S": "...", "T": "-", "U": "..-", "V": "...-", "W": ".--", "X": "-..-",
-        "Y": "-.--", "Z": "--..",
-        "0": "-----", "1": ".----", "2": "..---", "3": "...--", "4": "....-",
-        "5": ".....", "6": "-....", "7": "--...", "8": "---..", "9": "----.",
-        " ": "/"
+        ".-":"A","-...":"B","-.-.":"C","-..":"D",".":"E","..-.":"F",
+        "--.":"G","....":"H","..":"I",".---":"J","-.-":"K",".-..":"L",
+        "--":"M","-.":"N","---":"O",".--.":"P","--.-":"Q",".-.":"R",
+        "...":"S","-":"T","..-":"U","...-":"V",".--":"W","-..-":"X",
+        "-.--":"Y","--..":"Z","-----":"0",".----":"1","..---":"2",
+        "...--":"3","....-":"4",".....":"5","-....":"6","--...":"7",
+        "---..":"8","----.":"9","/":" "
       };
-      const input = document.getElementById('message').value.toUpperCase();
-      let output = "";
-      for (let i = 0; i < input.length; i++) {
-        output += (morseCode[input[i]] || '?') + " ";
-      }
-      document.getElementById('result').value = output.trim();
-      document.getElementById('brute-output').textContent = "";
-    }
-
-    function decodeMorse() {
-      const morseCode = {
-        ".-":"A", "-...":"B", "-.-.":"C", "-..":"D", ".":"E", "..-.":"F",
-        "--.":"G", "....":"H", "..":"I", ".---":"J", "-.-":"K", ".-..":"L",
-        "--":"M", "-.":"N", "---":"O", ".--.":"P", "--.-":"Q", ".-.":"R",
-        "...":"S", "-":"T", "..-":"U", "...-":"V", ".--":"W", "-..-":"X",
-        "-.--":"Y", "--..":"Z", "-----":"0", ".----":"1", "..---":"2",
-        "...--":"3", "....-":"4", ".....":"5", "-....":"6", "--...":"7",
-        "---..":"8", "----.":"9", "/":" "
-      };
-      const input = document.getElementById('message').value.trim();
-      const words = input.split('   ');
-      let decoded = words.map(word =>
-        word.split(' ').map(code => morseCode[code] || '?').join('')
+      return text.split('   ').map(word =>
+        word.split(' ').map(symbol => morseCode[symbol] || symbol).join('')
       ).join(' ');
-      document.getElementById('result').value = decoded;
-      document.getElementById('brute-output').textContent = "";
+    }
+
+    function caesar(str, shift) {
+      return str.split('').map(char => {
+        if (char.match(/[a-z]/i)) {
+          const code = char.charCodeAt(0);
+          const base = code >= 65 && code <= 90 ? 65 : 97;
+          return String.fromCharCode((code - base - shift + 26) % 26 + base);
+        }
+        return char;
+      }).join('');
+    }
+
+    function analyzeAndDecrypt() {
+      const input = document.getElementById("message").value;
+      const morseMatch = input.match(/([-\.\/ ]{5,})/);
+      let output = "";
+      let bruteOut = "";
+
+      if (morseMatch) {
+        const morseDecoded = decodeMorse(morseMatch[0].trim());
+        output += "Morse: " + morseDecoded + "\n";
+      }
+
+      const caesarPart = input.replace(/[-\.\/ ]{2,}/g, '').replace(/This is|If/gi, '').trim();
+      for (let shift = 1; shift < 26; shift++) {
+        bruteOut += `Shift ${shift}: ${caesar(caesarPart, shift)}\n`;
+      }
+
+      document.getElementById("result").value = output.trim();
+      document.getElementById("brute-output").textContent = bruteOut;
     }
 
     function playMorse() {
-      const morse = document.getElementById("result").value.trim();
-      if (!morse) return alert("No Morse code to play.");
+      const morse = document.getElementById("message").value.match(/[-\.\/ ]{5,}/);
+      if (!morse) return alert("No Morse code found to play.");
 
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       const ctx = new AudioContext();
-      const unit = 0.1; // seconds (100ms)
+      const unit = 0.1;
       let time = ctx.currentTime;
 
       function beep(duration) {
@@ -256,11 +140,10 @@
         gain.gain.setValueAtTime(1, time);
         osc.start(time);
         osc.stop(time + duration);
-        time += duration;
-        time += unit;
+        time += duration + unit;
       }
 
-      for (const char of morse) {
+      for (const char of morse[0]) {
         if (char === '.') beep(unit);
         else if (char === '-') beep(3 * unit);
         else if (char === ' ') time += 2 * unit;
