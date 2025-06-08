@@ -2,39 +2,66 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Multi Cipher Tool</title>
   <style>
     body {
       background: #1e1e1e;
       color: white;
       font-family: Arial, sans-serif;
-      padding: 2rem;
+      padding: 1rem;
     }
+
     textarea, input {
       width: 100%;
-      margin: 1rem 0;
-      padding: 0.5rem;
+      margin: 0.75rem 0;
+      padding: 0.75rem;
       font-size: 1rem;
       background: #2b2b2b;
       color: white;
       border: 1px solid #444;
+      border-radius: 6px;
     }
+
+    .button-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
     button {
+      flex: 1 1 45%;
       background: #333;
       color: white;
       border: none;
-      padding: 0.5rem 1rem;
-      margin: 0.3rem 0.3rem 0.3rem 0;
+      padding: 0.75rem;
+      font-size: 1rem;
+      border-radius: 6px;
+      min-width: 130px;
       cursor: pointer;
     }
+
     button:hover {
       background: #555;
     }
+
+    @media (max-width: 600px) {
+      button {
+        flex: 1 1 100%;
+      }
+    }
+
     pre {
       background: #2b2b2b;
       padding: 1rem;
       overflow-x: auto;
       border: 1px solid #444;
+      border-radius: 6px;
+    }
+
+    h1, h2 {
+      font-size: 1.5rem;
     }
   </style>
 </head>
@@ -47,12 +74,11 @@
   <label for="shift">Caesar Cipher Shift (0–26):</label>
   <input type="number" id="shift" min="0" max="26" value="3">
 
-  <div>
+  <div class="button-grid">
     <button onclick="encrypt()">Caesar Encrypt</button>
     <button onclick="decrypt()">Caesar Decrypt</button>
     <button onclick="bruteForceEncrypt()">Brute Force Caesar Encrypt</button>
     <button onclick="bruteForceDecrypt()">Brute Force Caesar Decrypt</button>
-    <br>
     <button onclick="encodeBase64()">Base64 Encrypt</button>
     <button onclick="decodeBase64()">Base64 Decrypt</button>
     <button onclick="encodeBase32()">Base32 Encrypt</button>
