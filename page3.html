@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Multi Cipher Tool</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: white;
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+    }
+    textarea, input, select {
+      width: 100%;
+      margin: 1rem 0;
+      padding: 0.5rem;
+      font-size: 1rem;
+      background: #2b2b2b;
+      color: white;
+      border: 1px solid #444;
+    }
+    button {
+      background: #333;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      margin: 0.5rem 0.5rem 0.5rem 0;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #555;
+    }
+    pre {
+      background: #2b2b2b;
+      padding: 1rem;
+      overflow-x: auto;
+      border: 1px solid #444;
+    }
+  </style>
+</head>
+<body>
+  <h1>Multi Cipher Tool</h1>
+
+  <label for="message">Message:</label>
+  <textarea id="message" rows="4" placeholder="Enter your message here..."></textarea>
+
+  <label for="shift">Caesar Cipher Shift (0–26):</label>
+  <input type="number" id="shift" min="0" max="26" value="3">
+
+  <div>
+    <button onclick="encrypt()">Caesar Encrypt</button>
+    <button onclick="decrypt()">Caesar Decrypt</button>
+    <button onclick="bruteForceEncrypt()">Brute Force Caesar Encrypt</button>
+    <button onclick="bruteForceDecrypt()">Brute Force Caesar Decrypt</button>
+    <button onclick="decodeBase64()">Base64 Decrypt</button>
+    <button onclick="decodeBase32()">Base32 Decrypt</button>
+    <button onclick="decodeMorse()">Morse Decrypt</button>
+  </div>
+
+  <h2>Result:</h2>
+  <textarea id="result" rows="4" readonly></textarea>
+
+  <h2>Brute Force Output:</h2>
+  <pre id="brute-output"></pre>
+
+  <script>
+    function caesar(str, shift, mode) {
+      let result = '';
+      for (let i = 0; i < str.length; i++) {
+        let char = str[i];
+        if (char.match(/[a-z]/i)) {
+          let code = str.charCodeAt(i);
+          let base = code >= 65 && code <= 90 ? 65 : 97;
+          if (mode === "encrypt") {
+            char = String.fromCharCode((code - base + shift) % 26 + base);
+          } else {
+            char = String.fromCharCode((code - base - shift + 26) % 26 + base);
+          }
+        }
+        result += char;
+      }
+      return result;
+    }
+
+    function encrypt() {
+      const text = document.getElementById('message').value;
+      const shift = parseInt(document.getElementById('shift').value);
+      document.getElementById('result').value = caesar(text, shift, "encrypt");
+      document.getElementById('brute-output').textContent = "";
+    }
+
+    function decrypt() {
+      const text = document.getElementById('message').value;
+      const shift = parseInt(document.getElementById('shift').value);
+      document.getElementById('result').value = caesar(text, shift, "decrypt");
+      document.getElementById('brute-output').textContent = "";
+    }
+
+    function bruteForceDecrypt() {
+      const text = document.getElementById('message').value;
+      let output = "";
+      for (let shift = 1; shift < 26; shift++) {
+        const result = caesar(text, shift, "decrypt");
+        output += `Shift ${shift}: ${result}\n`;
+      }
+      document.getElementById('brute-output').textContent = output;
+      document.getElementById('result').value = "";
+    }
+
+    function bruteForceEncrypt() {
+      const text = document.getElementById('message').value;
+      let output = "";
+      for (let shift = 1; shift < 26; shift++) {
+        const result = caesar(text, shift, "encrypt");
+        output += `Shift ${shift}: ${result}\n`;
+      }
+      document.getElementById('brute-output').textContent = output;
+      document.getElementById('result').value = "";
+    }
+
+    function decodeBase64() {
+      const text = document.getElementById('message').value;
+      try {
+        const decoded = atob(text);
+        document.getElementById('result').value = decoded;
+      } catch {
+        document.getElementById('result').value = "Invalid Base64 input.";
+      }
+    }
+
+    function decodeBase32() {
+      const base32chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+      const input = document.getElementById('message').value.replace(/=+$/, '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+      let bits = "", output = "";
+
+      for (let i = 0; i < input.length; i++) {
+        let val = base32chars.indexOf(input[i]);
+        if (val === -1) continue;
+        bits += val.toString(2).padStart(5, '0');
+      }
+      for (let i = 0; i + 8 <= bits.length; i += 8) {
+        output += String.fromCharCode(parseInt(bits.substring(i, i + 8), 2));
+      }
+
+      document.getElementById('result').value = output || "Invalid Base32 input.";
+    }
+
+    function decodeMorse() {
+      const morseCode = {
+        ".-":"A", "-...":"B", "-.-.":"C", "-..":"D", ".":"E", "..-.":"F",
+        "--.":"G", "....":"H", "..":"I", ".---":"J", "-.-":"K", ".-..":"L",
+        "--":"M", "-.":"N", "---":"O", ".--.":"P", "--.-":"Q", ".-.":"R",
+        "...":"S", "-":"T", "..-":"U", "...-":"V", ".--":"W", "-..-":"X",
+        "-.--":"Y", "--..":"Z", "-----":"0", ".----":"1", "..---":"2",
+        "...--":"3", "....-":"4", ".....":"5", "-....":"6", "--...":"7",
+        "---..":"8", "----.":"9", "/":" "
+      };
+      const input = document.getElementById('message').value.trim();
+      const words = input.split('   ');
+      let decoded = words.map(word =>
+        word.split(' ').map(code => morseCode[code] || '?').join('')
+      ).join(' ');
+      document.getElementById('result').value = decoded;
+    }
+  </script>
+</body>
+</html>
