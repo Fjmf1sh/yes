@@ -10,7 +10,7 @@
       font-family: Arial, sans-serif;
       padding: 2rem;
     }
-    textarea, input, select {
+    textarea, input {
       width: 100%;
       margin: 1rem 0;
       padding: 0.5rem;
@@ -24,7 +24,7 @@
       color: white;
       border: none;
       padding: 0.5rem 1rem;
-      margin: 0.5rem 0.5rem 0.5rem 0;
+      margin: 0.3rem 0.3rem 0.3rem 0;
       cursor: pointer;
     }
     button:hover {
@@ -52,9 +52,14 @@
     <button onclick="decrypt()">Caesar Decrypt</button>
     <button onclick="bruteForceEncrypt()">Brute Force Caesar Encrypt</button>
     <button onclick="bruteForceDecrypt()">Brute Force Caesar Decrypt</button>
+    <br>
+    <button onclick="encodeBase64()">Base64 Encrypt</button>
     <button onclick="decodeBase64()">Base64 Decrypt</button>
+    <button onclick="encodeBase32()">Base32 Encrypt</button>
     <button onclick="decodeBase32()">Base32 Decrypt</button>
+    <button onclick="encodeMorse()">Morse Encrypt</button>
     <button onclick="decodeMorse()">Morse Decrypt</button>
+    <button onclick="playMorse()">🔊 Play Morse</button>
   </div>
 
   <h2>Result:</h2>
@@ -118,6 +123,12 @@
       document.getElementById('result').value = "";
     }
 
+    function encodeBase64() {
+      const text = document.getElementById('message').value;
+      document.getElementById('result').value = btoa(text);
+      document.getElementById('brute-output').textContent = "";
+    }
+
     function decodeBase64() {
       const text = document.getElementById('message').value;
       try {
@@ -126,6 +137,23 @@
       } catch {
         document.getElementById('result').value = "Invalid Base64 input.";
       }
+    }
+
+    function encodeBase32() {
+      const base32chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+      let input = document.getElementById('message').value;
+      let bits = "", output = "";
+
+      for (let i = 0; i < input.length; i++) {
+        bits += input.charCodeAt(i).toString(2).padStart(8, '0');
+      }
+      for (let i = 0; i < bits.length; i += 5) {
+        let chunk = bits.substring(i, i + 5);
+        if (chunk.length < 5) chunk = chunk.padEnd(5, '0');
+        output += base32chars[parseInt(chunk, 2)];
+      }
+      document.getElementById('result').value = output;
+      document.getElementById('brute-output').textContent = "";
     }
 
     function decodeBase32() {
@@ -145,6 +173,26 @@
       document.getElementById('result').value = output || "Invalid Base32 input.";
     }
 
+    function encodeMorse() {
+      const morseCode = {
+        "A": ".-", "B": "-...", "C": "-.-.", "D": "-..", "E": ".", "F": "..-.",
+        "G": "--.", "H": "....", "I": "..", "J": ".---", "K": "-.-", "L": ".-..",
+        "M": "--", "N": "-.", "O": "---", "P": ".--.", "Q": "--.-", "R": ".-.",
+        "S": "...", "T": "-", "U": "..-", "V": "...-", "W": ".--", "X": "-..-",
+        "Y": "-.--", "Z": "--..",
+        "0": "-----", "1": ".----", "2": "..---", "3": "...--", "4": "....-",
+        "5": ".....", "6": "-....", "7": "--...", "8": "---..", "9": "----.",
+        " ": "/"
+      };
+      const input = document.getElementById('message').value.toUpperCase();
+      let output = "";
+      for (let i = 0; i < input.length; i++) {
+        output += (morseCode[input[i]] || '?') + " ";
+      }
+      document.getElementById('result').value = output.trim();
+      document.getElementById('brute-output').textContent = "";
+    }
+
     function decodeMorse() {
       const morseCode = {
         ".-":"A", "-...":"B", "-.-.":"C", "-..":"D", ".":"E", "..-.":"F",
@@ -161,6 +209,37 @@
         word.split(' ').map(code => morseCode[code] || '?').join('')
       ).join(' ');
       document.getElementById('result').value = decoded;
+      document.getElementById('brute-output').textContent = "";
+    }
+
+    function playMorse() {
+      const morse = document.getElementById("result").value.trim();
+      if (!morse) return alert("No Morse code to play.");
+
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioContext();
+      const unit = 0.1; // seconds (100ms)
+      let time = ctx.currentTime;
+
+      function beep(duration) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(750, time);
+        gain.gain.setValueAtTime(1, time);
+        osc.start(time);
+        osc.stop(time + duration);
+        time += duration;
+        time += unit;
+      }
+
+      for (const char of morse) {
+        if (char === '.') beep(unit);
+        else if (char === '-') beep(3 * unit);
+        else if (char === ' ') time += 2 * unit;
+        else if (char === '/') time += 4 * unit;
+      }
     }
   </script>
 </body>
