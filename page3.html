@@ -65,9 +65,12 @@
   <textarea id="message" rows="4" placeholder="Enter your message here..."></textarea>
 
   <div class="button-grid">
+    <button onclick="encryptCaesar()">Caesar Encrypt</button>
+    <button onclick="encodeMorse()">Morse Encrypt</button>
+    <button onclick="encodeBase64()">Base64 Encrypt</button>
     <button onclick="analyzeAndDecrypt()">🔍 Analyze & Decrypt</button>
     <button onclick="playMorse()">🔊 Play Morse</button>
-  </div>
+</div>
 
   <h2>Result:</h2>
   <textarea id="result" rows="4" readonly></textarea>
@@ -76,6 +79,39 @@
   <pre id="brute-output"></pre>
 
   <script>
+    function encodeBase64() {
+      const input = document.getElementById("message").value;
+      try {
+        document.getElementById("result").value = btoa(input);
+        document.getElementById("brute-output").textContent = "";
+      } catch {
+        document.getElementById("result").value = "Invalid input for Base64 encoding.";
+      }
+    }
+
+    function encryptCaesar() {
+      const text = document.getElementById("message").value;
+      const shift = 3; // default shift
+      document.getElementById("result").value = caesar(text, -shift); // negative shift for encryption
+      document.getElementById("brute-output").textContent = "";
+    }
+
+    function encodeMorse() {
+      const morseCode = {
+        "A": ".-", "B": "-...", "C": "-.-.", "D": "-..", "E": ".", "F": "..-.",
+        "G": "--.", "H": "....", "I": "..", "J": ".---", "K": "-.-", "L": ".-..",
+        "M": "--", "N": "-.", "O": "---", "P": ".--.", "Q": "--.-", "R": ".-.",
+        "S": "...", "T": "-", "U": "..-", "V": "...-", "W": ".--", "X": "-..-",
+        "Y": "-.--", "Z": "--..", "0": "-----", "1": ".----", "2": "..---",
+        "3": "...--", "4": "....-", "5": ".....", "6": "-....", "7": "--...",
+        "8": "---..", "9": "----.", " ": "/"
+      };
+      const input = document.getElementById("message").value.toUpperCase();
+      const result = input.split('').map(char => morseCode[char] || '?').join(' ');
+      document.getElementById("result").value = result;
+      document.getElementById("brute-output").textContent = "";
+    }
+
     function decodeMorse(text) {
       const morseCode = {
         ".-":"A","-...":"B","-.-.":"C","-..":"D",".":"E","..-.":"F",
