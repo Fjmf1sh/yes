@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Async Permutation Generator (Dark Mode)</title>
+  <style>
+    :root {
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --text: #e0e0e0;
+      --accent: #bb86fc;
+      --btn-bg: #2a2a2a;
+      --btn-hover: #333333;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+    input, button {
+      font-size: 1rem;
+      padding: .5rem;
+      margin-right: .5rem;
+      background-color: var(--surface);
+      color: var(--text);
+      border: 1px solid #333;
+      border-radius: 4px;
+    }
+    input::placeholder {
+      color: #888;
+    }
+    button {
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    button:not(:disabled):hover {
+      background-color: var(--btn-hover);
+    }
+    #status {
+      margin-top: 1rem;
+      font-style: italic;
+    }
+    #output {
+      margin-top: 1rem;
+      white-space: pre-wrap;
+      max-height: 50vh;
+      overflow: auto;
+      background-color: var(--surface);
+      padding: 1rem;
+      border-radius: 4px;
+      border: 1px solid #333;
+    }
+    h1 {
+      margin-bottom: 1rem;
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <h1>Permutation Generator (Web Worker)</h1>
+  <input type="text" id="input" placeholder="Enter characters">
+  <button id="generate">Generate</button>
+  <button id="download" disabled>Download .txt</button>
+  <div id="status"></div>
+  <div id="output"></div>
+
+  <script>
+    const workerCode = `
+      self.onmessage = function(e) {
+        const str = e.data;
+        const arr = str.split('');
+        const n = arr.length;
+        const c = new Array(n).fill(0);
+        let i = 0, batch = [];
+        const sendBatch = () => {
+          self.postMessage({ type: 'batch', data: batch });
+          batch = [];
+        };
+        batch.push(arr.join(''));
+        while (i < n) {
+          if (c[i] < i) {
+            const swapIdx = i % 2 === 0 ? 0 : c[i];
+            [arr[i], arr[swapIdx]] = [arr[swapIdx], arr[i]];
+            batch.push(arr.join(''));
+            c[i]++;
+            i = 0;
+            if (batch.length >= 5000) sendBatch();
+          } else {
+            c[i] = 0;
+            i++;
+          }
+        }
+        if (batch.length) sendBatch();
+        self.postMessage({ type: 'done' });
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+
+    let lines = [];
+    let count = 0;
+
+    document.getElementById('generate').onclick = () => {
+      const str = document.getElementById('input').value;
+      if (!str) return alert('Enter some characters.');
+      lines = []; count = 0;
+      document.getElementById('status').textContent = 'Working…';
+      document.getElementById('output').textContent = '';
+      document.getElementById('download').disabled = true;
+      worker.postMessage(str);
+    };
+
+    worker.onmessage = (e) => {
+      if (e.data.type === 'batch') {
+        lines.push(...e.data.data);
+        count += e.data.data.length;
+        document.getElementById('status').textContent = count + ' generated…';
+        const preview = lines.slice(0, 5).concat(['…']).concat(lines.slice(-5));
+        document.getElementById('output').textContent = preview.join('\n');
+      } else if (e.data.type === 'done') {
+        document.getElementById('status').textContent = 'Done: ' + count + ' total';
+        document.getElementById('download').disabled = false;
+      }
+    };
+
+    document.getElementById('download').onclick = () => {
+      const blob = new Blob([ lines.join(' ') ], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'permutations.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  </script>
+</body>
+</html>
