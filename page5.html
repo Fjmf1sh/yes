@@ -3,8 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>📝 Text→Binary | F1shHub</title>
+  <title>📝 Text↔Binary | F1shHub</title>
   <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
     body {
       background-color: #0a0a0a;
       background-image: radial-gradient(#ff4444 1px, transparent 1px);
@@ -13,7 +18,6 @@
       font-family: 'Segoe UI', sans-serif;
       text-align: center;
       padding: 3em;
-      margin: 0;
     }
     .box {
       background: rgba(0, 0, 0, 0.8);
@@ -30,6 +34,56 @@
       color: #ff4444;
       margin-bottom: 1em;
     }
+    .conv-type {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1em;
+      font-size: 0.95em;
+    }
+    .conv-type-label {
+      margin-left: 0.5em;
+      color: #e0e0e0;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #222;
+      transition: .4s;
+      border-radius: 24px;
+      box-shadow: 0 0 5px rgba(255,68,68,0.4);
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background: #ff4444;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
     .conv-input {
       width: 100%;
       max-width: 500px;
@@ -41,6 +95,7 @@
       color: white;
       font-size: 1em;
       box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      resize: vertical;
     }
     .conv-controls {
       display: flex;
@@ -87,40 +142,80 @@
 </head>
 <body>
   <div class="box">
-    <h1>📝 Text → Binary</h1>
+    <h1>📝 Text ↔ Binary</h1>
+
+    <div class="conv-type">
+      <label class="switch">
+        <input type="checkbox" id="dirToggle">
+        <span class="slider"></span>
+      </label>
+      <span id="dirLabel" class="conv-type-label">Text → Binary</span>
+    </div>
+
     <textarea id="input" class="conv-input" rows="4" placeholder="Type or paste text here…"></textarea>
+
     <div class="conv-controls">
       <button id="convert" class="conv-btn">Convert</button>
       <button id="download" class="conv-btn" disabled>Download .txt</button>
     </div>
+
     <div id="output"></div>
   </div>
 
   <script>
+    const dirToggle = document.getElementById('dirToggle');
+    const dirLabel = document.getElementById('dirLabel');
     const inp = document.getElementById('input');
     const out = document.getElementById('output');
     const btnConvert = document.getElementById('convert');
     const btnDownload = document.getElementById('download');
-    let binaryText = '';
+    let resultText = '';
+
+    function updatePlaceholder() {
+      if (dirToggle.checked) {
+        dirLabel.textContent = 'Binary → Text';
+        inp.placeholder = 'Type or paste binary (8-bit groups)…';
+      } else {
+        dirLabel.textContent = 'Text → Binary';
+        inp.placeholder = 'Type or paste text here…';
+      }
+      out.textContent = '';
+      btnDownload.disabled = true;
+    }
+
+    dirToggle.addEventListener('change', updatePlaceholder);
+    updatePlaceholder();
 
     btnConvert.onclick = () => {
-      const text = inp.value;
-      if (!text) return alert('Enter some text to convert.');
-      // convert each char to 8-bit binary
-      binaryText = Array.from(text)
-        .map(ch => ch.charCodeAt(0).toString(2).padStart(8,'0'))
-        .join(' ');
-      out.textContent = binaryText;
+      const text = inp.value.trim();
+      if (!text) return alert('Enter some input.');
+      if (dirToggle.checked) {
+        // Binary → Text
+        const tokens = text.split(/\s+/);
+        const chars = tokens.map(bin => {
+          const code = parseInt(bin, 2);
+          return isNaN(code) ? '?' : String.fromCharCode(code);
+        });
+        resultText = chars.join('');
+      } else {
+        // Text → Binary
+        resultText = Array.from(text)
+          .map(ch => ch.charCodeAt(0).toString(2).padStart(8,'0'))
+          .join(' ');
+      }
+      out.textContent = resultText;
       btnDownload.disabled = false;
     };
 
     btnDownload.onclick = () => {
-      if (!binaryText) return;
-      const blob = new Blob([binaryText], { type: 'text/plain' });
+      if (!resultText) return;
+      const blob = new Blob([resultText], { type: 'text/plain' });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = 'text-to-binary.txt';
+      a.download = dirToggle.checked
+        ? 'binary-to-text.txt'
+        : 'text-to-binary.txt';
       a.click();
       URL.revokeObjectURL(url);
     };
