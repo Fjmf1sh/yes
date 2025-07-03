@@ -22,32 +22,50 @@
       max-width: 600px;
       margin: auto;
       box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+      
+      /* center all children vertically & horizontally */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     h1 {
       color: #ff4444;
       margin-bottom: 1em;
     }
+
+    /* input styling */
     .perm-input {
       width: 100%;
+      max-width: 500px;
       padding: .8em;
-      margin: .5em 0;
       background: #222;
       border: none;
       border-radius: 10px;
       color: white;
       font-size: 1em;
       box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      margin-bottom: 1em;
     }
+
+    /* button wrapper for flex layout */
+    .perm-controls {
+      display: flex;
+      gap: 1em;
+      justify-content: center;
+      margin-bottom: 1em;
+      width: 100%;
+      max-width: 500px;
+    }
+
     .perm-btn {
-      display: inline-block;
+      flex: 1;
+      min-width: 120px;
       background-color: #222;
-      margin: .5em;
-      padding: .8em 1.2em;
+      padding: .8em;
+      border: none;
       border-radius: 10px;
       color: white;
-      text-decoration: none;
       font-size: 1em;
-      border: none;
       cursor: pointer;
       transition: background-color 0.3s;
       box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
@@ -59,11 +77,13 @@
       opacity: 0.5;
       cursor: default;
     }
+
     #status {
-      margin-top: 1em;
       font-style: italic;
     }
     #output {
+      width: 100%;
+      max-width: 500px;
       margin-top: 1em;
       background: rgba(0, 0, 0, 0.8);
       padding: 1em;
@@ -80,7 +100,7 @@
   <div class="box">
     <h1>😶‍🌫️ Permutations</h1>
     <input type="text" id="input" class="perm-input" placeholder="Enter characters">
-    <div>
+    <div class="perm-controls">
       <button id="generate" class="perm-btn">Generate</button>
       <button id="download" class="perm-btn" disabled>Download .txt</button>
     </div>
@@ -121,8 +141,7 @@
     const blob = new Blob([workerCode], { type: 'application/javascript' });
     const worker = new Worker(URL.createObjectURL(blob));
 
-    let lines = [];
-    let count = 0;
+    let lines = [], count = 0;
 
     document.getElementById('generate').onclick = () => {
       const str = document.getElementById('input').value;
