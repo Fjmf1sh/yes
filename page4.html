@@ -1,73 +1,92 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Async Permutation Generator (Dark Mode)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>😶‍🌫️ Permutations | F1shHub</title>
   <style>
-    :root {
-      --bg: #121212;
-      --surface: #1e1e1e;
-      --text: #e0e0e0;
-      --accent: #bb86fc;
-      --btn-bg: #2a2a2a;
-      --btn-hover: #333333;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: sans-serif;
-      padding: 2rem;
-      background-color: var(--bg);
-      color: var(--text);
+      background-color: #0a0a0a;
+      background-image: radial-gradient(#ff4444 1px, transparent 1px);
+      background-size: 20px 20px;
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      padding: 3em;
+      margin: 0;
     }
-    input, button {
-      font-size: 1rem;
-      padding: .5rem;
-      margin-right: .5rem;
-      background-color: var(--surface);
-      color: var(--text);
-      border: 1px solid #333;
-      border-radius: 4px;
+    .box {
+      background: rgba(0, 0, 0, 0.8);
+      padding: 2em;
+      border-radius: 15px;
+      max-width: 600px;
+      margin: auto;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
     }
-    input::placeholder {
-      color: #888;
+    h1 {
+      color: #ff4444;
+      margin-bottom: 1em;
     }
-    button {
+    .perm-input {
+      width: 100%;
+      padding: .8em;
+      margin: .5em 0;
+      background: #222;
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-size: 1em;
+      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+    }
+    .perm-btn {
+      display: inline-block;
+      background-color: #222;
+      margin: .5em;
+      padding: .8em 1.2em;
+      border-radius: 10px;
+      color: white;
+      text-decoration: none;
+      font-size: 1em;
+      border: none;
       cursor: pointer;
+      transition: background-color 0.3s;
+      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
     }
-    button:disabled {
+    .perm-btn:hover:not(:disabled) {
+      background-color: #ff4444;
+    }
+    .perm-btn:disabled {
       opacity: 0.5;
       cursor: default;
     }
-    button:not(:disabled):hover {
-      background-color: var(--btn-hover);
-    }
     #status {
-      margin-top: 1rem;
+      margin-top: 1em;
       font-style: italic;
     }
     #output {
-      margin-top: 1rem;
-      white-space: pre-wrap;
-      max-height: 50vh;
+      margin-top: 1em;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 1em;
+      border-radius: 10px;
+      max-height: 40vh;
       overflow: auto;
-      background-color: var(--surface);
-      padding: 1rem;
-      border-radius: 4px;
-      border: 1px solid #333;
-    }
-    h1 {
-      margin-bottom: 1rem;
-      color: var(--accent);
+      text-align: left;
+      white-space: pre-wrap;
+      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
     }
   </style>
 </head>
 <body>
-  <h1>Permutation Generator (Web Worker)</h1>
-  <input type="text" id="input" placeholder="Enter characters">
-  <button id="generate">Generate</button>
-  <button id="download" disabled>Download .txt</button>
-  <div id="status"></div>
-  <div id="output"></div>
+  <div class="box">
+    <h1>😶‍🌫️ Permutations</h1>
+    <input type="text" id="input" class="perm-input" placeholder="Enter characters">
+    <div>
+      <button id="generate" class="perm-btn">Generate</button>
+      <button id="download" class="perm-btn" disabled>Download .txt</button>
+    </div>
+    <div id="status"></div>
+    <div id="output"></div>
+  </div>
 
   <script>
     const workerCode = `
@@ -129,7 +148,7 @@
     };
 
     document.getElementById('download').onclick = () => {
-      const blob = new Blob([ lines.join(' ') ], { type: 'text/plain' });
+      const blob = new Blob([ lines.join('\n') ], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
