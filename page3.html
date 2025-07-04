@@ -1,82 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Multi Cipher Tool</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🔐 Multi Cipher Tool</title>
+
+  <!-- Press Start 2P Pixel Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
+
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #1e1e1e;
+      background-color: #0a0a0a;
+      background-image: radial-gradient(#ff4444 1px, transparent 1px);
+      background-size: 20px 20px;
       color: white;
-      font-family: Arial, sans-serif;
-      padding: 1rem;
+      font-family: 'Press Start 2P', monospace;
+      text-align: center;
+      padding: 3em;
     }
-
-    textarea, input {
+    .box {
+      background: rgba(0, 0, 0, 0.8);
+      padding: 2em;
+      border-radius: 15px;
+      max-width: 600px;
+      margin: auto;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      color: #ff4444;
+      margin-bottom: 1em;
+      font-size: 1.25rem;
+    }
+    label {
+      align-self: flex-start;
+      margin-left: 1em;
+      font-size: 0.75rem;
+    }
+    textarea, input[type="text"] {
       width: 100%;
-      margin: 0.75rem 0;
-      padding: 0.75rem;
-      font-size: 1rem;
-      background: #2b2b2b;
+      max-width: 550px;
+      margin: 0.5em 0;
+      padding: 0.75em;
+      background: #222;
       color: white;
-      border: 1px solid #444;
-      border-radius: 6px;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      resize: vertical;
     }
-
     .button-grid {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 1rem;
+      gap: 0.5em;
+      justify-content: center;
+      width: 100%;
+      max-width: 550px;
+      margin: 1em 0;
     }
-
     button {
-      flex: 1 1 100%;
-      background: #3a3a3a;
+      flex: 1 1 45%;
+      background: #222;
       color: white;
       border: none;
-      padding: 0.75rem;
-      font-size: 1rem;
-      border-radius: 6px;
+      padding: 0.75em;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      border-radius: 10px;
       cursor: pointer;
+      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      transition: background-color 0.3s;
     }
-
     button:hover {
-      background: #555;
+      background-color: #ff4444;
     }
-
+    #result {
+      width: 100%;
+      max-width: 550px;
+      margin: 0.5em 0;
+      padding: 0.75em;
+      background: #222;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      resize: none;
+    }
     pre {
-      background: #2b2b2b;
-      padding: 1rem;
+      width: 100%;
+      max-width: 550px;
+      background: #222;
+      color: white;
+      padding: 1em;
+      border-radius: 10px;
       overflow-x: auto;
-      border: 1px solid #444;
-      border-radius: 6px;
-    }
-
-    h1, h2 {
-      font-size: 1.5rem;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
+      text-align: left;
+      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
     }
   </style>
 </head>
 <body>
-  <h1>Multi Cipher Tool</h1>
+  <div class="box">
+    <h1>🔐 Multi Cipher Tool</h1>
+    <label for="message">Message:</label>
+    <textarea id="message" rows="4" placeholder="Enter your message here…"></textarea>
 
-  <label for="message">Message:</label>
-  <textarea id="message" rows="4" placeholder="Enter your message here..."></textarea>
+    <div class="button-grid">
+      <button onclick="encryptCaesar()">Caesar Encrypt</button>
+      <button onclick="encodeMorse()">Morse Encrypt</button>
+      <button onclick="encodeBase64()">Base64 Encrypt</button>
+      <button onclick="analyzeAndDecrypt()">🔍 Analyze & Decrypt</button>
+      <button onclick="playMorse()">🔊 Play Morse</button>
+    </div>
 
-  <div class="button-grid">
-    <button onclick="encryptCaesar()">Caesar Encrypt</button>
-    <button onclick="encodeMorse()">Morse Encrypt</button>
-    <button onclick="encodeBase64()">Base64 Encrypt</button>
-    <button onclick="analyzeAndDecrypt()">🔍 Analyze & Decrypt</button>
-    <button onclick="playMorse()">🔊 Play Morse</button>
-</div>
+    <label for="result">Result:</label>
+    <textarea id="result" rows="4" readonly></textarea>
 
-  <h2>Result:</h2>
-  <textarea id="result" rows="4" readonly></textarea>
-
-  <h2>Brute Force Output:</h2>
-  <pre id="brute-output"></pre>
+    <label>Brute Force Output:</label>
+    <pre id="brute-output"></pre>
+  </div>
 
   <script>
     function encodeBase64() {
@@ -91,99 +140,71 @@
 
     function encryptCaesar() {
       const text = document.getElementById("message").value;
-      const shift = 3; // default shift
-      document.getElementById("result").value = caesar(text, -shift); // negative shift for encryption
+      const shift = 3;
+      document.getElementById("result").value = caesar(text, -shift);
       document.getElementById("brute-output").textContent = "";
     }
 
     function encodeMorse() {
-      const morseCode = {
-        "A": ".-", "B": "-...", "C": "-.-.", "D": "-..", "E": ".", "F": "..-.",
-        "G": "--.", "H": "....", "I": "..", "J": ".---", "K": "-.-", "L": ".-..",
-        "M": "--", "N": "-.", "O": "---", "P": ".--.", "Q": "--.-", "R": ".-.",
-        "S": "...", "T": "-", "U": "..-", "V": "...-", "W": ".--", "X": "-..-",
-        "Y": "-.--", "Z": "--..", "0": "-----", "1": ".----", "2": "..---",
-        "3": "...--", "4": "....-", "5": ".....", "6": "-....", "7": "--...",
-        "8": "---..", "9": "----.", " ": "/"
-      };
+      const morseCode = {"A":".-","B":"-...","C":"-.-.","D":"-..","E":".","F":"..-.",
+        "G":"--.","H":"....","I":"..","J":".---","K":"-.-","L":".-..",
+        "M":"--","N":"-.","O":"---","P":".--.","Q":"--.-","R":".-.",
+        "S":"...","T":"-","U":"..-","V":"...-","W":".--","X":"-..-",
+        "Y":"-.--","Z":"--..","0":"-----","1":".----","2":"..---",
+        "3":"...--","4":"....-","5":".....","6":"-....","7":"--...",
+        "8":"---..","9":"----."," ":"/"};
       const input = document.getElementById("message").value.toUpperCase();
-      const result = input.split('').map(char => morseCode[char] || '?').join(' ');
+      const result = input.split('').map(c => morseCode[c]||'?').join(' ');
       document.getElementById("result").value = result;
       document.getElementById("brute-output").textContent = "";
     }
 
     function decodeMorse(text) {
-      const morseCode = {
-        ".-":"A","-...":"B","-.-.":"C","-..":"D",".":"E","..-.":"F",
+      const map = {".-":"A","-...":"B","-.-.":"C","-..":"D",".":"E","..-.":"F",
         "--.":"G","....":"H","..":"I",".---":"J","-.-":"K",".-..":"L",
         "--":"M","-.":"N","---":"O",".--.":"P","--.-":"Q",".-.":"R",
         "...":"S","-":"T","..-":"U","...-":"V",".--":"W","-..-":"X",
         "-.--":"Y","--..":"Z","-----":"0",".----":"1","..---":"2",
         "...--":"3","....-":"4",".....":"5","-....":"6","--...":"7",
-        "---..":"8","----.":"9","/":" "
-      };
-      return text.split('   ').map(word =>
-        word.split(' ').map(symbol => morseCode[symbol] || symbol).join('')
-      ).join(' ');
+        "---..":"8","----.":"9","/":" "};
+      return text.split('   ').map(w => w.split(' ').map(s => map[s]||s).join('')).join(' ');
     }
 
     function caesar(str, shift) {
-      return str.split('').map(char => {
-        if (char.match(/[a-z]/i)) {
-          const code = char.charCodeAt(0);
-          const base = code >= 65 && code <= 90 ? 65 : 97;
+      return str.split('').map(c => {
+        if (/[a-z]/i.test(c)) {
+          const code = c.charCodeAt(0);
+          const base = code < 97 ? 65 : 97;
           return String.fromCharCode((code - base - shift + 26) % 26 + base);
         }
-        return char;
+        return c;
       }).join('');
     }
 
     function analyzeAndDecrypt() {
-      const input = document.getElementById("message").value;
-      const morseMatch = input.match(/([-\.\/ ]{5,})/);
-      let output = "";
-      let bruteOut = "";
-
-      if (morseMatch) {
-        const morseDecoded = decodeMorse(morseMatch[0].trim());
-        output += "Morse: " + morseDecoded + "\n";
-      }
-
-      const caesarPart = input.replace(/[-\.\/ ]{2,}/g, '').replace(/This is|If/gi, '').trim();
-      for (let shift = 1; shift < 26; shift++) {
-        bruteOut += `Shift ${shift}: ${caesar(caesarPart, shift)}\n`;
-      }
-
+      const inp = document.getElementById("message").value;
+      const morseMatch = inp.match(/[-\.\/ ]{5,}/);
+      let output = '';
+      let brute = '';
+      if (morseMatch) output += 'Morse: ' + decodeMorse(morseMatch[0].trim()) + '\n';
+      const textOnly = inp.replace(/[-\.\/ ]{2,}/g,'').trim();
+      for (let s=1; s<26; s++) brute += `Shift ${s}: ${caesar(textOnly,s)}\n`;
       document.getElementById("result").value = output.trim();
-      document.getElementById("brute-output").textContent = bruteOut;
+      document.getElementById("brute-output").textContent = brute;
     }
 
     function playMorse() {
-      const morse = document.getElementById("message").value.match(/[-\.\/ ]{5,}/);
-      if (!morse) return alert("No Morse code found to play.");
-
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AudioContext();
-      const unit = 0.1;
-      let time = ctx.currentTime;
-
-      function beep(duration) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.setValueAtTime(750, time);
-        gain.gain.setValueAtTime(1, time);
-        osc.start(time);
-        osc.stop(time + duration);
-        time += duration + unit;
-      }
-
-      for (const char of morse[0]) {
-        if (char === '.') beep(unit);
-        else if (char === '-') beep(3 * unit);
-        else if (char === ' ') time += 2 * unit;
-        else if (char === '/') time += 4 * unit;
+      const code = document.getElementById("message").value.match(/[-\.\/ ]{5,}/);
+      if (!code) return alert('No Morse code found.');
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const unit=0.1; let t=ctx.currentTime;
+      const beep = d => { const o=ctx.createOscillator(),g=ctx.createGain(); o.connect(g);g.connect(ctx.destination);
+        o.frequency.value=750; g.gain.setValueAtTime(1,t); o.start(t); o.stop(t+d); t+=d+unit; };
+      for (const ch of code[0]) {
+        if (ch==='.') beep(unit);
+        else if (ch==='-') beep(3*unit);
+        else if (ch===' ') t+=2*unit;
+        else if (ch==='/') t+=4*unit;
       }
     }
   </script>
