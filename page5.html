@@ -2,24 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>📝 Text↔Binary</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>😶‍🌫️ Permutations</title>
 
   <!-- Press Start 2P Pixel Font -->
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
-  
+
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background-color: #0a0a0a;
       background-image: radial-gradient(#ff4444 1px, transparent 1px);
       background-size: 20px 20px;
       color: white;
-      font-family: 'Segoe UI', sans-serif;
+      font-family: 'Press Start 2P', monospace;
       text-align: center;
       padding: 3em;
     }
@@ -37,79 +33,30 @@
     h1 {
       color: #ff4444;
       margin-bottom: 1em;
+      font-size: 1.25rem;
     }
-    .conv-type {
-      display: flex;
-      align-items: center;
-      margin-bottom: 1em;
-      font-size: 0.95em;
-    }
-    .conv-type-label {
-      margin-left: 0.5em;
-      color: #e0e0e0;
-    }
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 50px;
-      height: 24px;
-    }
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: #222;
-      transition: .4s;
-      border-radius: 24px;
-      box-shadow: 0 0 5px rgba(255,68,68,0.4);
-    }
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 18px;
-      width: 18px;
-      left: 3px;
-      bottom: 3px;
-      background: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-    input:checked + .slider {
-      background: #ff4444;
-    }
-    input:checked + .slider:before {
-      transform: translateX(26px);
-    }
-    .conv-input {
+    .perm-input {
       width: 100%;
       max-width: 500px;
-      margin: 0 auto 1em;
+      margin-bottom: 1em;
       padding: .8em;
       background: #222;
       border: none;
       border-radius: 10px;
       color: white;
-      font-size: 1em;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
       box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
-      resize: vertical;
     }
-    .conv-controls {
+    .perm-controls {
       display: flex;
       gap: 1em;
       justify-content: center;
+      margin-bottom: 1em;
       width: 100%;
       max-width: 500px;
-      margin-bottom: 1em;
     }
-    .conv-btn {
+    .perm-btn {
       flex: 1;
       min-width: 120px;
       background-color: #222;
@@ -117,17 +64,23 @@
       border: none;
       border-radius: 10px;
       color: white;
-      font-size: 1em;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
       cursor: pointer;
       transition: background-color 0.3s;
       box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
     }
-    .conv-btn:hover:not(:disabled) {
+    .perm-btn:hover:not(:disabled) {
       background-color: #ff4444;
     }
-    .conv-btn:disabled {
+    .perm-btn:disabled {
       opacity: 0.5;
       cursor: default;
+    }
+    #status {
+      font-style: italic;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
     }
     #output {
       width: 100%;
@@ -141,85 +94,86 @@
       text-align: left;
       white-space: pre-wrap;
       box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
     }
   </style>
 </head>
 <body>
   <div class="box">
-    <h1>📝 Text ↔ Binary</h1>
-
-    <div class="conv-type">
-      <label class="switch">
-        <input type="checkbox" id="dirToggle">
-        <span class="slider"></span>
-      </label>
-      <span id="dirLabel" class="conv-type-label">Text → Binary</span>
+    <h1>😶‍🌫️ Permutations</h1>
+    <input type="text" id="input" class="perm-input" placeholder="Enter characters">
+    <div class="perm-controls">
+      <button id="generate" class="perm-btn">Generate</button>
+      <button id="download" class="perm-btn" disabled>Download .txt</button>
     </div>
-
-    <textarea id="input" class="conv-input" rows="4" placeholder="Type or paste text here…"></textarea>
-
-    <div class="conv-controls">
-      <button id="convert" class="conv-btn">Convert</button>
-      <button id="download" class="conv-btn" disabled>Download .txt</button>
-    </div>
-
+    <div id="status"></div>
     <div id="output"></div>
   </div>
 
   <script>
-    const dirToggle = document.getElementById('dirToggle');
-    const dirLabel = document.getElementById('dirLabel');
-    const inp = document.getElementById('input');
-    const out = document.getElementById('output');
-    const btnConvert = document.getElementById('convert');
-    const btnDownload = document.getElementById('download');
-    let resultText = '';
+    const workerCode = `
+      self.onmessage = function(e) {
+        const arr = e.data.split('');
+        const n = arr.length;
+        const c = Array(n).fill(0);
+        let i = 0, batch = [];
+        const sendBatch = () => {
+          self.postMessage({ type: 'batch', data: batch });
+          batch = [];
+        };
+        batch.push(arr.join(''));
+        while (i < n) {
+          if (c[i] < i) {
+            const swapIdx = i % 2 === 0 ? 0 : c[i];
+            [arr[i], arr[swapIdx]] = [arr[swapIdx], arr[i]];
+            batch.push(arr.join(''));
+            c[i]++;
+            i = 0;
+            if (batch.length >= 5000) sendBatch();
+          } else {
+            c[i] = 0;
+            i++;
+          }
+        }
+        if (batch.length) sendBatch();
+        self.postMessage({ type: 'done' });
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
 
-    function updatePlaceholder() {
-      if (dirToggle.checked) {
-        dirLabel.textContent = 'Binary → Text';
-        inp.placeholder = 'Type or paste binary (8-bit groups)…';
-      } else {
-        dirLabel.textContent = 'Text → Binary';
-        inp.placeholder = 'Type or paste text here…';
-      }
-      out.textContent = '';
-      btnDownload.disabled = true;
-    }
+    let lines = [], count = 0;
 
-    dirToggle.addEventListener('change', updatePlaceholder);
-    updatePlaceholder();
-
-    btnConvert.onclick = () => {
-      const text = inp.value.trim();
-      if (!text) return alert('Enter some input.');
-      if (dirToggle.checked) {
-        // Binary → Text
-        const tokens = text.split(/\s+/);
-        const chars = tokens.map(bin => {
-          const code = parseInt(bin, 2);
-          return isNaN(code) ? '?' : String.fromCharCode(code);
-        });
-        resultText = chars.join('');
-      } else {
-        // Text → Binary
-        resultText = Array.from(text)
-          .map(ch => ch.charCodeAt(0).toString(2).padStart(8,'0'))
-          .join(' ');
-      }
-      out.textContent = resultText;
-      btnDownload.disabled = false;
+    document.getElementById('generate').onclick = () => {
+      const str = document.getElementById('input').value;
+      if (!str) return alert('Enter some characters.');
+      lines = []; count = 0;
+      document.getElementById('status').textContent = 'Working…';
+      document.getElementById('output').textContent = '';
+      document.getElementById('download').disabled = true;
+      worker.postMessage(str);
     };
 
-    btnDownload.onclick = () => {
-      if (!resultText) return;
-      const blob = new Blob([resultText], { type: 'text/plain' });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = dirToggle.checked
-        ? 'binary-to-text.txt'
-        : 'text-to-binary.txt';
+    worker.onmessage = (e) => {
+      if (e.data.type === 'batch') {
+        lines.push(...e.data.data);
+        count += e.data.data.length;
+        document.getElementById('status').textContent = count + ' generated…';
+        const preview = lines.slice(0, 5).concat(['…']).concat(lines.slice(-5));
+        document.getElementById('output').textContent = preview.join('\n');
+      } else if (e.data.type === 'done') {
+        document.getElementById('status').textContent = 'Done: ' + count + ' total';
+        document.getElementById('download').disabled = false;
+      }
+    };
+
+    document.getElementById('download').onclick = () => {
+      const blob = new Blob([ lines.join('\n') ], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'permutations.txt';
       a.click();
       URL.revokeObjectURL(url);
     };
