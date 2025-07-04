@@ -2,22 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>😶‍🌫️ Permutations</title>
 
   <!-- Press Start 2P Pixel Font -->
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
-  
+
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background-color: #0a0a0a;
       background-image: radial-gradient(#ff4444 1px, transparent 1px);
       background-size: 20px 20px;
       color: white;
-      font-family: 'Segoe UI', sans-serif;
+      font-family: 'Press Start 2P', monospace;
       text-align: center;
       padding: 3em;
-      margin: 0;
     }
     .box {
       background: rgba(0, 0, 0, 0.8);
@@ -26,8 +26,6 @@
       max-width: 600px;
       margin: auto;
       box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
-      
-      /* center all children vertically & horizontally */
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -35,23 +33,21 @@
     h1 {
       color: #ff4444;
       margin-bottom: 1em;
+      font-size: 1.25rem;
     }
-
-    /* input styling */
     .perm-input {
       width: 100%;
       max-width: 500px;
+      margin-bottom: 1em;
       padding: .8em;
       background: #222;
       border: none;
       border-radius: 10px;
       color: white;
-      font-size: 1em;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
       box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
-      margin-bottom: 1em;
     }
-
-    /* button wrapper for flex layout */
     .perm-controls {
       display: flex;
       gap: 1em;
@@ -60,7 +56,6 @@
       width: 100%;
       max-width: 500px;
     }
-
     .perm-btn {
       flex: 1;
       min-width: 120px;
@@ -69,7 +64,8 @@
       border: none;
       border-radius: 10px;
       color: white;
-      font-size: 1em;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
       cursor: pointer;
       transition: background-color 0.3s;
       box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
@@ -81,9 +77,10 @@
       opacity: 0.5;
       cursor: default;
     }
-
     #status {
       font-style: italic;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
     }
     #output {
       width: 100%;
@@ -97,6 +94,8 @@
       text-align: left;
       white-space: pre-wrap;
       box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.75rem;
     }
   </style>
 </head>
@@ -115,10 +114,9 @@
   <script>
     const workerCode = `
       self.onmessage = function(e) {
-        const str = e.data;
-        const arr = str.split('');
+        const arr = e.data.split('');
         const n = arr.length;
-        const c = new Array(n).fill(0);
+        const c = Array(n).fill(0);
         let i = 0, batch = [];
         const sendBatch = () => {
           self.postMessage({ type: 'batch', data: batch });
