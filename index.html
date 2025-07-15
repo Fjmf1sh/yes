@@ -5,10 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>F1sh</title>
 
-  <!-- Press Start 2P Pixel Font -->
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
 
-  <!-- Open Graph -->
   <meta property="og:title" content="F1sh">
   <meta property="og:description" content="A site for all of fish's projects!">
   <meta property="og:image" content="https://fjmf1sh.click/preview.png">
@@ -85,5 +83,28 @@
       </iframe>
     </div>
   </div>
+
+  <script>
+  fetch("https://some-api-compat-thing.onrender.com/api/status")
+    .then(res => res.json())
+    .then(data => {
+      if (!data.access) {
+        document.body.innerHTML = `
+          <style>
+            body {
+              background-color: black;
+              color: white;
+              font-family: 'Press Start 2P', monospace;
+              text-align: center;
+              padding-top: 20vh;
+            }
+          </style>
+          <h1>🚫 ACCESS DENIED</h1>
+          <p>This site is currently unavailable.</p>
+        `;
+      }
+    })
+    .catch(err => console.error("API error:", err));
+  </script>
 </body>
 </html>
