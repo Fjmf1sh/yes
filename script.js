@@ -55,3 +55,4 @@ setInterval(() => {
       console.error("Error during fetch:", err);
     });
 }, 3000);
+
