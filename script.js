@@ -1,4 +1,8 @@
-let currentMessage = "";
+const banner = document.createElement("div");
+banner.id = "live-banner";
+banner.style.cssText = "background: #ff4444; color: white; font-family: 'Press Start 2P'; padding: 1em; position: fixed; top: 0; left: 0; right: 0; z-index: 999;";
+banner.style.display = 'none'
+document.body.prepend(banner);
 
 async function checkStatus() {
   try {
@@ -21,26 +25,6 @@ async function checkStatus() {
       `;
       return;
     }
-
-    if (data.message && data.message !== currentMessage) {
-      currentMessage = data.message;
-
-      const oldBanner = document.getElementById("live-banner");
-      if (oldBanner) oldBanner.remove();
-
-      const banner = document.createElement("div");
-      banner.id = "live-banner";
-      banner.style.cssText = "background: #ff4444; color: white; font-family: 'Press Start 2P'; padding: 1em; position: fixed; top: 0; left: 0; right: 0; z-index: 999;";
-      banner.textContent = currentMessage;
-      document.body.prepend(banner);
-
-      setTimeout(() => {
-        const b = document.getElementById("live-banner");
-        if (b) b.remove();
-        currentMessage = "";
-      }, 7000);
-    }
-
   } catch (err) {
     console.error("Status check failed:", err);
   }
@@ -48,3 +32,19 @@ async function checkStatus() {
 
 checkStatus();
 setInterval(checkStatus, 3000);
+
+setInterval(() => {
+  fetch('https://some-api-compat-thing.onrender.com/api/client-poll').then((res) => {
+    if (res.ok) {
+      return res.json()
+    }
+  }).then((json) => {
+    if (json.message.trim().length >= 1) {
+      banner.innerText = json.message.trim()
+      banner.style.display = 'block'
+    } else {
+      banner.innerText = ""
+      banner.style.display = 'none'
+    }
+  }}
+}, 3000);
