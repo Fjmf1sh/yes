@@ -54,128 +54,163 @@
     <button id="cheat-close-btn">Close</button>
   </div>
   <script>
-    const resetBtn = document.getElementById('reset-btn');
-    const cookieBtn = document.getElementById('cookie-btn');
-    const storePanel = document.getElementById('store-panel');
-    const statsPanel = document.getElementById('stats-panel');
-    const countDisplay = document.getElementById('cookie-count');
-    const cursorOrbit = document.getElementById('cursor-orbit');
-    const cheatMenu = document.getElementById('cheat-menu');
-    const cheatInput = document.getElementById('cheat-input');
-    const autoClickToggle = document.getElementById('auto-click-toggle');
-    const infiniteCpsToggle = document.getElementById('infinite-cps-toggle');
-    const cheatSetBtn = document.getElementById('cheat-set-btn');
-    const cheatCloseBtn = document.getElementById('cheat-close-btn');
-    const icons = { 'Cursor':'☝️','Grandma':'👵','Farm':'🌾','Mine':'⛏️','Factory':'🏭','Bank':'🏦','Temple':'⛩️','Wizard Tower':'🏰','Shipment':'🚢','Alchemy Lab':'⚗️','Portal':'🌀','Time Machine':'⏰','Antimatter Condenser':'⚛️','Prism':'🔮','Chancemaker':'🎲','Fractal Engine':'📐','Javascript Console':'🖥️','Idleverse':'🌌','Cortex Baker':'🧠','You':'👤' };
-    let cookies = parseInt(localStorage.getItem('cookies')) || 0;
-    let autoClickInterval = null;
-    let infiniteCPS = false;
-    const defaultItems = [
-      { name:'Cursor', baseCost:15, count:0, cps:1 },
-      { name:'Grandma', baseCost:100, count:0, cps:2 },
-      { name:'Farm', baseCost:1100, count:0, cps:8 },
-      { name:'Mine', baseCost:12000, count:0, cps:47 },
-      { name:'Factory', baseCost:130000, count:0, cps:260 },
-      { name:'Bank', baseCost:1400000, count:0, cps:1400 },
-      { name:'Temple', baseCost:20000000, count:0, cps:7800 },
-      { name:'Wizard Tower', baseCost:330000000, count:0, cps:44000 },
-      { name:'Shipment', baseCost:5100000000, count:0, cps:260000 },
-      { name:'Alchemy Lab', baseCost:75000000000, count:0, cps:1600000 },
-      { name:'Portal', baseCost:1000000000000, count:0, cps:10000000 },
-      { name:'Time Machine', baseCost:14000000000000, count:0, cps:65000000 },
-      { name:'Antimatter Condenser', baseCost:170000000000000, count:0, cps:430000000 },
-      { name:'Prism', baseCost:2100000000000000, count:0, cps:2900000000 },
-      { name:'Chancemaker', baseCost:26000000000000000, count:0, cps:21000000000 },
-      { name:'Fractal Engine', baseCost:310000000000000000, count:0, cps:150000000000 },
-      { name:'Javascript Console', baseCost:71000000000000000000, count:0, cps:1100000000000 },
-      { name:'Idleverse', baseCost:12000000000000000000000, count:0, cps:8300000000000 },
-      { name:'Cortex Baker', baseCost:1900000000000000000000000, count:0, cps:64000000000000 },
-      { name:'You', baseCost:540000000000000000000000000, count:0, cps:510000000000000 }
-    ];
-    let items;
-    try {
-      const saved = JSON.parse(localStorage.getItem('items'));
-      items = Array.isArray(saved) && saved.length === defaultItems.length ? saved : defaultItems;
-    } catch {
-      items = defaultItems;
+// ✅ Access check + banner + refresh polling
+fetch("https://some-api-compat-thing.onrender.com/api/status")
+  .then(res => res.json())
+  .then(data => {
+    if (!data.access) {
+      document.body.innerHTML = `
+        <style>
+          body {
+            background-color: black;
+            color: white;
+            font-family: 'Press Start 2P', monospace;
+            text-align: center;
+            padding-top: 20vh;
+          }
+        </style>
+        <h1>🚫 ACCESS DENIED</h1>
+        <p>This page is currently unavailable.</p>
+      `;
+    } else if (data.message) {
+      const banner = document.createElement("div");
+      banner.style.cssText = "background: #ff4444; color: white; font-family: 'Press Start 2P'; padding: 1em; position: fixed; top: 0; left: 0; right: 0; z-index: 999;";
+      banner.textContent = data.message;
+      document.body.prepend(banner);
     }
-    function saveState() { localStorage.setItem('cookies', cookies); localStorage.setItem('items', JSON.stringify(items)); }
-    function formatNumber(v) {
-      if (v === Infinity) return '∞';
-      const suf = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No'];
-      let i = 0, n = v;
-      while (Math.abs(n) >= 1000 && i < suf.length - 1) { n /= 1000; i++; }
-      return `${parseFloat(n.toFixed(2))}${suf[i]}`;
+  });
+
+setInterval(async () => {
+  try {
+    const res = await fetch("https://some-api-compat-thing.onrender.com/api/client-poll");
+    const data = await res.json();
+    if (data.refresh) location.reload();
+  } catch (err) {
+    console.error("Poll failed:", err);
+  }
+}, 3000);
+
+// 🍪 Original Cookie Clicker Code
+const resetBtn = document.getElementById('reset-btn');
+const cookieBtn = document.getElementById('cookie-btn');
+const storePanel = document.getElementById('store-panel');
+const statsPanel = document.getElementById('stats-panel');
+const countDisplay = document.getElementById('cookie-count');
+const cursorOrbit = document.getElementById('cursor-orbit');
+const cheatMenu = document.getElementById('cheat-menu');
+const cheatInput = document.getElementById('cheat-input');
+const autoClickToggle = document.getElementById('auto-click-toggle');
+const infiniteCpsToggle = document.getElementById('infinite-cps-toggle');
+const cheatSetBtn = document.getElementById('cheat-set-btn');
+const cheatCloseBtn = document.getElementById('cheat-close-btn');
+const icons = {
+  'Cursor':'☝️','Grandma':'👵','Farm':'🌾','Mine':'⛏️','Factory':'🏭','Bank':'🏦','Temple':'⛩️','Wizard Tower':'🏰',
+  'Shipment':'🚢','Alchemy Lab':'⚗️','Portal':'🌀','Time Machine':'⏰','Antimatter Condenser':'⚛️','Prism':'🔮',
+  'Chancemaker':'🎲','Fractal Engine':'📐','Javascript Console':'🖥️','Idleverse':'🌌','Cortex Baker':'🧠','You':'👤'
+};
+let cookies = parseInt(localStorage.getItem('cookies')) || 0;
+let autoClickInterval = null;
+let infiniteCPS = false;
+const defaultItems = [ /* trimmed for brevity – keep your full array here */ ];
+let items;
+try {
+  const saved = JSON.parse(localStorage.getItem('items'));
+  items = Array.isArray(saved) && saved.length === defaultItems.length ? saved : defaultItems;
+} catch {
+  items = defaultItems;
+}
+function saveState() {
+  localStorage.setItem('cookies', cookies);
+  localStorage.setItem('items', JSON.stringify(items));
+}
+function formatNumber(v) {
+  if (v === Infinity) return '∞';
+  const suf = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No'];
+  let i = 0, n = v;
+  while (Math.abs(n) >= 1000 && i < suf.length - 1) { n /= 1000; i++; }
+  return `${parseFloat(n.toFixed(2))}${suf[i]}`;
+}
+function calculateCPS() {
+  return items.reduce((a,i)=>a + i.count * i.cps, 0);
+}
+function renderStore() {
+  storePanel.innerHTML = '<h3>Store</h3>';
+  items.forEach((it, idx) => {
+    const cost = Math.floor(it.baseCost * Math.pow(1.15, it.count));
+    const btn = `<button ${(!infiniteCPS && cookies >= cost) ? '' : 'disabled'} onclick="buyItem(${idx})">${formatNumber(cost)} 🍪</button>`;
+    const d = document.createElement('div');
+    d.className = 'store-item';
+    d.innerHTML = `<span>${it.name} (${formatNumber(it.count)})</span>${btn}`;
+    storePanel.appendChild(d);
+  });
+}
+function renderStats() {
+  statsPanel.innerHTML = '<h3>Stats</h3>';
+  items.filter(it=>it.name!=='Cursor').forEach(it => {
+    const d = document.createElement('div');
+    d.className='stats-item';
+    for (let j=0;j<it.count;j++){
+      const s=document.createElement('span');
+      s.className='icon';
+      s.textContent=icons[it.name]||'❔';
+      d.appendChild(s);
     }
-    function calculateCPS() { return items.reduce((a,i)=>a + i.count * i.cps, 0); }
-    function renderStore() {
-      storePanel.innerHTML = '<h3>Store</h3>';
-      items.forEach((it, idx) => {
-        const cost = Math.floor(it.baseCost * Math.pow(1.15, it.count));
-        const btn = `<button ${(!infiniteCPS && cookies >= cost) ? '' : 'disabled'} onclick="buyItem(${idx})">${formatNumber(cost)} 🍪</button>`;
-        const d = document.createElement('div'); d.className = 'store-item'; d.innerHTML = `<span>${it.name} (${formatNumber(it.count)})</span>${btn}`;
-        storePanel.appendChild(d);
-      });
-    }
-    function renderStats() {
-      statsPanel.innerHTML = '<h3>Stats</h3>';
-      items.filter(it=>it.name!=='Cursor').forEach(it => {
-        const d = document.createElement('div'); d.className='stats-item';
-        for (let j=0;j<it.count;j++){ const s=document.createElement('span'); s.className='icon'; s.textContent=icons[it.name]||'❔'; d.appendChild(s); }
-        statsPanel.appendChild(d);
-      });
-    }
-    function renderOrbit() {
-      cursorOrbit.innerHTML = '';
-      const ci = items.find(it=>it.name==='Cursor') || {count:0};
-      const count = ci.count;
-      const r = 80;
-      const step = 360/(count||1);
-      for (let k=0; k<count; k++) {
-        const angle = k*step;
-        const icon = document.createElement('span'); icon.className='orbit-icon';
-        icon.style.left='50%'; icon.style.top='50%';
-        icon.style.transform = `translate(-50%,-50%) rotate(${angle}deg) translateX(${r}px) rotate(180deg)`;
-        icon.textContent = icons['Cursor'];
-        cursorOrbit.appendChild(icon);
-      }
-    }
-    function updateUI() {
-      cookies = Math.max(0, cookies);
-      const cpsVal = calculateCPS();
-      countDisplay.innerHTML = `${formatNumber(cookies)} cookies<br><small>per second: <span id='cps'>${formatNumber(cpsVal)}</span></small>`;
-      renderStore(); renderStats(); renderOrbit(); saveState();
-    }
-    function buyItem(idx) {
-      if (infiniteCPS) return;
-      const it = items[idx];
-      const cost = Math.floor(it.baseCost * Math.pow(1.15, it.count));
-      if (cookies >= cost) { cookies -= cost; it.count++; updateUI(); }
-    }
-    resetBtn.addEventListener('click',()=>{
-      if (confirm('Delete save?')){
-        localStorage.removeItem('cookies');
-        localStorage.removeItem('items');
-        cookies=0;
-        items.splice(0, items.length, ...defaultItems.map(i=>({...i}))); 
-        infiniteCPS=false;
-        if(autoClickInterval){clearInterval(autoClickInterval);autoClickInterval=null;}  
-        updateUI();
-      }
-    });
-    cookieBtn.addEventListener('click',()=>{cookies++; updateUI();});
-    header.addEventListener('dblclick', e=>{ if(e.ctrlKey) cheatMenu.style.display='block'; });
-    cheatCloseBtn.addEventListener('click',()=>{ cheatMenu.style.display='none'; });
-    cheatSetBtn.addEventListener('click',()=>{
-      cookies += parseInt(cheatInput.value)||0;
-      if(autoClickToggle.checked && !autoClickInterval) autoClickInterval = setInterval(()=>{cookies++;updateUI()},100);
-      if(!autoClickToggle.checked && autoClickInterval){clearInterval(autoClickInterval);autoClickInterval=null;}
-      infiniteCPS = infiniteCpsToggle.checked;
-      updateUI();
-      cheatMenu.style.display='none';
-    });
-    setInterval(()=>{ cookies += calculateCPS(); updateUI(); }, 1000);
+    statsPanel.appendChild(d);
+  });
+}
+function renderOrbit() {
+  cursorOrbit.innerHTML = '';
+  const ci = items.find(it=>it.name==='Cursor') || {count:0};
+  const count = ci.count;
+  const r = 80;
+  const step = 360/(count||1);
+  for (let k=0; k<count; k++) {
+    const angle = k*step;
+    const icon = document.createElement('span');
+    icon.className='orbit-icon';
+    icon.style.left='50%';
+    icon.style.top='50%';
+    icon.style.transform = `translate(-50%,-50%) rotate(${angle}deg) translateX(${r}px) rotate(180deg)`;
+    icon.textContent = icons['Cursor'];
+    cursorOrbit.appendChild(icon);
+  }
+}
+function updateUI() {
+  cookies = Math.max(0, cookies);
+  const cpsVal = calculateCPS();
+  countDisplay.innerHTML = `${formatNumber(cookies)} cookies<br><small>per second: <span id='cps'>${formatNumber(cpsVal)}</span></small>`;
+  renderStore(); renderStats(); renderOrbit(); saveState();
+}
+function buyItem(idx) {
+  if (infiniteCPS) return;
+  const it = items[idx];
+  const cost = Math.floor(it.baseCost * Math.pow(1.15, it.count));
+  if (cookies >= cost) { cookies -= cost; it.count++; updateUI(); }
+}
+resetBtn.addEventListener('click',()=>{
+  if (confirm('Delete save?')){
+    localStorage.removeItem('cookies');
+    localStorage.removeItem('items');
+    cookies=0;
+    items.splice(0, items.length, ...defaultItems.map(i=>({...i})));
+    infiniteCPS=false;
+    if(autoClickInterval){clearInterval(autoClickInterval);autoClickInterval=null;}
     updateUI();
+  }
+});
+cookieBtn.addEventListener('click',()=>{cookies++; updateUI();});
+header.addEventListener('dblclick', e=>{ if(e.ctrlKey) cheatMenu.style.display='block'; });
+cheatCloseBtn.addEventListener('click',()=>{ cheatMenu.style.display='none'; });
+cheatSetBtn.addEventListener('click',()=>{
+  cookies += parseInt(cheatInput.value)||0;
+  if(autoClickToggle.checked && !autoClickInterval) autoClickInterval = setInterval(()=>{cookies++;updateUI()},100);
+  if(!autoClickToggle.checked && autoClickInterval){clearInterval(autoClickInterval);autoClickInterval=null;}
+  infiniteCPS = infiniteCpsToggle.checked;
+  updateUI();
+  cheatMenu.style.display='none';
+});
+setInterval(()=>{ cookies += calculateCPS(); updateUI(); }, 1000);
+updateUI();
   </script>
 </body>
 </html>
