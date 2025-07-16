@@ -34,17 +34,24 @@ checkStatus();
 setInterval(checkStatus, 3000);
 
 setInterval(() => {
-  fetch('https://some-api-compat-thing.onrender.com/api/client-poll').then((res) => {
-    if (res.ok) {
-      return res.json()
-    }
-  }).then((json) => {
-    if (json.message.trim().length >= 1) {
-      banner.innerText = json.message.trim()
-      banner.style.display = 'block'
-    } else {
-      banner.innerText = ""
-      banner.style.display = 'none'
-    }
-  }}
+  fetch('https://some-api-compat-thing.onrender.com/api/client-poll')
+    .then((res) => {
+      if (res.ok) {
+        return res.json();
+      } else {
+        throw new Error("Fetch failed with status: " + res.status);
+      }
+    })
+    .then((json) => {
+      if (json.message.trim().length >= 1) {
+        banner.innerText = json.message.trim();
+        banner.style.display = 'block';
+      } else {
+        banner.innerText = "";
+        banner.style.display = 'none';
+      }
+    })
+    .catch((err) => {
+      console.error("Error during fetch:", err);
+    });
 }, 3000);
