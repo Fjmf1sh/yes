@@ -1,7 +1,10 @@
+let currentMessage = "";
 
-fetch("https://some-api-compat-thing.onrender.com/api/status")
-  .then(res => res.json())
-  .then(data => {
+async function checkStatus() {
+  try {
+    const res = await fetch("https://some-api-compat-thing.onrender.com/api/status");
+    const data = await res.json();
+    
     if (!data.access) {
       document.body.innerHTML = `
         <style>
@@ -16,20 +19,32 @@ fetch("https://some-api-compat-thing.onrender.com/api/status")
         <h1>🚫 ACCESS DENIED</h1>
         <p>This page is currently unavailable.</p>
       `;
-    } else if (data.message) {
-      const banner = document.createElement("div");
-      banner.style.cssText = "background: #ff4444; color: white; font-family: 'Press Start 2P'; padding: 1em; position: fixed; top: 0; left: 0; right: 0; z-index: 999;";
-      banner.textContent = data.message;
-      document.body.prepend(banner);
+      return;
     }
-  });
 
-setInterval(async () => {
-  try {
-    const res = await fetch("https://some-api-compat-thing.onrender.com/api/client-poll");
-    const data = await res.json();
-    if (data.refresh) location.reload();
+    if (data.message && data.message !== currentMessage) {
+      currentMessage = data.message;
+
+      const oldBanner = document.getElementById("live-banner");
+      if (oldBanner) oldBanner.remove();
+
+      const banner = document.createElement("div");
+      banner.id = "live-banner";
+      banner.style.cssText = "background: #ff4444; color: white; font-family: 'Press Start 2P'; padding: 1em; position: fixed; top: 0; left: 0; right: 0; z-index: 999;";
+      banner.textContent = currentMessage;
+      document.body.prepend(banner);
+
+      setTimeout(() => {
+        const b = document.getElementById("live-banner");
+        if (b) b.remove();
+        currentMessage = "";
+      }, 7000);
+    }
+
   } catch (err) {
-    console.error("Poll failed:", err);
+    console.error("Status check failed:", err);
   }
-}, 3000);
+}
+
+checkStatus();
+setInterval(checkStatus, 3000);
