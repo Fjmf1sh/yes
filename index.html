@@ -14,14 +14,28 @@
   <meta property="og:type" content="website">
 
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    height: 100%;
+    min-height: 100vh;
+  }
+
   body {
     background: linear-gradient(to bottom right, #ff0000, #000000);
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
     color: white;
     font-family: 'Press Start 2P', 'Segoe UI', sans-serif;
     text-align: center;
     padding: 3em;
   }
+
   .box {
     background: rgba(0, 0, 0, 0.8);
     padding: 2em;
@@ -30,11 +44,13 @@
     margin: auto;
     box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
   }
+
   h1 {
     color: #ff4444;
     margin-bottom: 1em;
     font-family: 'Press Start 2P', monospace;
   }
+
   .nav a {
     display: block;
     background-color: #222;
@@ -48,15 +64,18 @@
     transition: background-color 0.3s;
     box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
   }
+
   .nav a:hover {
     background-color: #ff4444;
   }
+
   .spotify-player {
     margin-top: 2em;
     border-radius: 12px;
     overflow: hidden;
   }
 </style>
+
 </head>
 <body>
   <div class="box">
