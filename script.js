@@ -1,20 +1,19 @@
 const banner = document.createElement("div");
 banner.id = "live-banner";
-banner.style.cssText = `
-  background: #bb88ff;
-  color: white;
-  font-family: 'Press Start 2P', monospace;
-  padding: 1em;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 999;
-  text-align: center;
-  text-shadow: 0 0 8px white;
-  box-shadow: 0 0 15px #bb88ff;
-`;
-banner.style.display = 'none';
+banner.style.background = "#bb88ff";
+banner.style.color = "white";
+banner.style.fontFamily = "'Press Start 2P', monospace";
+banner.style.padding = "1em";
+banner.style.position = "fixed";
+banner.style.top = "0";
+banner.style.left = "0";
+banner.style.right = "0";
+banner.style.zIndex = "9999";
+banner.style.textAlign = "center";
+banner.style.display = "none";
+banner.style.textShadow = "0 0 8px white";
+banner.style.boxShadow = "0 0 20px #bb88ff";
+
 document.body.prepend(banner);
 
 async function checkStatus() {
