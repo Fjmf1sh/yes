@@ -10,48 +10,83 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background-color: #0a0a0a;
-      background-image: radial-gradient(#ff4444 1px, transparent 1px);
-      background-size: 20px 20px;
-      color: white;
+
+    html, body {
+      height: 100%;
+      background: black;
+      overflow: hidden;
       font-family: 'Press Start 2P', monospace;
+      color: #bb88ff;
       text-align: center;
       padding: 3em;
     }
+
+    .stars-container {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .star {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: white;
+      border-radius: 50%;
+      opacity: 0;
+      animation: twinkle 3s infinite;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+
     .box {
+      position: relative;
+      z-index: 1;
       background: rgba(0, 0, 0, 0.8);
       padding: 2em;
       border-radius: 15px;
       max-width: 600px;
       margin: auto;
-      box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+      box-shadow: 0 0 20px rgba(187, 136, 255, 0.5);
       display: flex;
       flex-direction: column;
       align-items: center;
     }
+
     h1 {
-      color: #ff4444;
+      color: #bb88ff;
       margin-bottom: 1em;
       font-size: 1.25rem;
     }
+
     .conv-type {
       display: flex;
       align-items: center;
       margin-bottom: 1em;
       font-size: 0.75rem;
     }
+
     .conv-type-label {
       margin-left: 0.5em;
     }
+
     .switch {
       position: relative;
       width: 50px;
       height: 24px;
     }
+
     .switch input {
       opacity: 0; width: 0; height: 0;
     }
+
     .slider {
       position: absolute;
       cursor: pointer;
@@ -59,8 +94,9 @@
       background: #222;
       transition: .4s;
       border-radius: 24px;
-      box-shadow: 0 0 5px rgba(255,68,68,0.4);
+      box-shadow: 0 0 5px rgba(187,136,255,0.4);
     }
+
     .slider:before {
       content: "";
       position: absolute;
@@ -70,42 +106,49 @@
       transition: .4s;
       border-radius: 50%;
     }
+
     input:checked + .slider {
-      background: #ff4444;
+      background: #bb88ff;
     }
+
     input:checked + .slider:before {
       transform: translateX(26px);
     }
+
     .conv-input {
       width: 100%; max-width: 550px;
       padding: .8em; margin-bottom: 1em;
       background: #222; border: none; border-radius: 10px;
       color: white; font-size: 0.75rem;
-      font-family: 'Press Start 2P', monospace;
-      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      box-shadow: 0 0 10px rgba(187, 136, 255, 0.4);
       resize: vertical;
     }
+
     .conv-controls {
       display: flex; gap: 1em;
       justify-content: center;
       width: 100%; max-width: 550px;
       margin-bottom: 1em;
     }
+
     .conv-btn {
       flex: 1; min-width: 120px;
       background: #222; border: none; border-radius: 10px;
       color: white; font-size: 0.75rem;
-      font-family: 'Press Start 2P', monospace;
       padding: .8em; cursor: pointer;
-      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      box-shadow: 0 0 10px rgba(187, 136, 255, 0.4);
       transition: background-color 0.3s;
     }
+
     .conv-btn:hover:not(:disabled) {
-      background-color: #ff4444;
+      background-color: #bb88ff;
+      color: black;
     }
+
     .conv-btn:disabled {
       opacity: 0.5; cursor: default;
     }
+
     #output {
       width: 100%; max-width: 550px;
       margin-top: 1em;
@@ -113,13 +156,28 @@
       padding: 1em; border-radius: 10px;
       max-height: 40vh; overflow: auto;
       text-align: left; white-space: pre-wrap;
-      font-family: 'Press Start 2P', monospace;
       font-size: 0.75rem;
-      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      box-shadow: 0 0 10px rgba(187, 136, 255, 0.4);
     }
   </style>
 </head>
 <body>
+
+  <!-- 🌌 Stars Background -->
+  <div class="stars-container">
+    <script>
+      for (let i = 0; i < 100; i++) {
+        const star = document.createElement('div');
+        star.classList.add('star');
+        star.style.left = `${Math.random() * 100}vw`;
+        star.style.top = `${Math.random() * 100}vh`;
+        star.style.animationDuration = `${2 + Math.random() * 3}s`;
+        star.style.animationDelay = `${Math.random() * 5}s`;
+        document.currentScript.parentElement.appendChild(star);
+      }
+    </script>
+  </div>
+
   <div class="box">
     <h1>📝 Text ↔ Binary</h1>
     <div class="conv-type">
@@ -137,8 +195,6 @@
     <div id="output"></div>
   </div>
 
-  <script src="script.js"></script>
-  
   <script>
     const dirToggle = document.getElementById('dirToggle');
     const dirLabel = document.getElementById('dirLabel');
