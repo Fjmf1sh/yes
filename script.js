@@ -1,7 +1,17 @@
 const banner = document.createElement("div");
 banner.id = "live-banner";
-banner.style.cssText = "background: #ff4444; color: white; font-family: 'Press Start 2P'; padding: 1em; position: fixed; top: 0; left: 0; right: 0; z-index: 999;";
-banner.style.display = 'none'
+banner.style.cssText = `
+  background: #bb88ff;
+  color: white;
+  font-family: 'Press Start 2P';
+  padding: 1em;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+`;
+banner.style.display = 'none';
 document.body.prepend(banner);
 
 async function checkStatus() {
@@ -55,4 +65,3 @@ setInterval(() => {
       console.error("Error during fetch:", err);
     });
 }, 3000);
-
