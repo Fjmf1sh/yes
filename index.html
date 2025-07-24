@@ -22,16 +22,16 @@
       padding: 0;
     }
 
-html, body {
-  min-height: 100vh;
-  overflow-x: hidden;
-  overflow-y: auto;
-  background: black;
-  font-family: 'Press Start 2P', 'Segoe UI', sans-serif;
-  color: #bb88ff;
-  text-align: center;
-  padding: 3em 1em;
-}
+    html, body {
+      min-height: 100vh;
+      overflow-x: hidden;
+      overflow-y: auto;
+      background: black;
+      font-family: 'Press Start 2P', 'Segoe UI', sans-serif;
+      color: #bb88ff;
+      text-align: center;
+      padding: 3em 1em;
+    }
 
     .star {
       position: absolute;
@@ -95,36 +95,23 @@ html, body {
       box-shadow: 0 0 15px rgba(187, 136, 255, 0.5);
     }
 
-    .spotify-player {
+    #poll-wrapper {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 1em;
+      border-radius: 15px;
+      box-shadow: 0 0 15px #bb88ff;
       margin-top: 2em;
-      border-radius: 12px;
-      overflow: hidden;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      color: white;
+      text-align: left;
     }
 
-#poll-container {
-  position: fixed;
-  top: 50%;
-  right: 2em;
-  transform: translateY(-50%);
-  width: 300px;
-  max-height: 90vh;
-  overflow-y: auto;
-  padding: 1em;
-  background: rgba(0, 0, 0, 0.85);
-  box-shadow: 0 0 25px rgba(187, 136, 255, 0.4);
-  border-radius: 15px;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 10px;
-  color: white;
-  z-index: 9999;
-  text-align: left;
-}
-
-    #poll-container h3 {
+    #poll-wrapper h3 {
       color: #bb88ff;
       font-size: 12px;
-      margin-bottom: 1em;
       text-align: center;
+      margin-bottom: 0.5em;
     }
   </style>
 </head>
@@ -145,7 +132,7 @@ html, body {
     </script>
   </div>
 
-  <!-- Main content -->
+  <!-- Main Content -->
   <div class="box">
     <h1>🧭 F1sh 🧭</h1>
     <div class="nav">
@@ -156,27 +143,17 @@ html, body {
       <a href="page5.html">🕶️ Binary</a>
     </div>
 
-    <div class="spotify-player">
-      <iframe style="border-radius:12px" 
-        src="https://open.spotify.com/embed/playlist/5klNz59cORHvo1PWWyeNg6?utm_source=generator&theme=0" 
-        width="100%" height="352" frameBorder="0" 
-        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-        loading="lazy">
-      </iframe>
+    <!-- Polls Merged Here -->
+    <div id="poll-wrapper">
+      <h3>🗳️ Active Poll</h3>
+      <div id="live-poll">Loading...</div>
+      <hr style="margin: 1em 0; border-color: #bb88ff;">
+      <h3>📊 Last Poll</h3>
+      <div id="last-poll">Loading...</div>
     </div>
   </div>
 
-  <!-- Polls Sidebar -->
-<div id="poll-container">
-  <h3>🗳️ Active Poll</h3>
-  <div id="live-poll">Loading...</div>
-  <hr style="margin: 1em 0; border-color: #bb88ff;">
-  <h3>📊 Last Poll</h3>
-  <div id="last-poll">Loading...</div>
-</div>
-
 <!-- Scripts -->
-<script src="script.js"></script>
 <script>
 function loadActivePoll() {
   fetch("https://some-api-compat-thing.onrender.com/api/current-poll")
@@ -251,7 +228,6 @@ function loadLastPoll() {
     });
 }
 
-// Refresh polls every 5 seconds
 setInterval(() => {
   loadActivePoll();
   loadLastPoll();
