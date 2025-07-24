@@ -17,34 +17,55 @@
 
     html, body {
       height: 100%;
-      min-height: 100vh;
-    }
-
-    body {
-      background: linear-gradient(to bottom right, #ff0000, #000000);
-      background-size: cover;
-      background-repeat: no-repeat;
-      background-attachment: fixed;
-      color: white;
+      overflow: hidden;
+      background: black;
       font-family: 'Press Start 2P', monospace;
+      color: #bb88ff;
       text-align: center;
       padding: 3em;
     }
 
+    .stars-container {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+
+    .star {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: white;
+      border-radius: 50%;
+      opacity: 0;
+      animation: twinkle 3s infinite;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+
     .box {
+      position: relative;
+      z-index: 1;
       background: rgba(0, 0, 0, 0.8);
       padding: 2em;
       border-radius: 15px;
       max-width: 600px;
       margin: auto;
-      box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+      box-shadow: 0 0 20px rgba(187, 136, 255, 0.5);
       display: flex;
       flex-direction: column;
       align-items: center;
     }
 
     h1 {
-      color: #ff4444;
+      color: #bb88ff;
       margin-bottom: 1em;
       font-size: 1.25rem;
     }
@@ -89,12 +110,13 @@
       font-size: 0.75rem;
       border-radius: 10px;
       cursor: pointer;
-      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      box-shadow: 0 0 10px rgba(187, 136, 255, 0.4);
       transition: background-color 0.3s;
     }
 
     button:hover {
-      background-color: #ff4444;
+      background-color: #bb88ff;
+      color: black;
     }
 
     #result {
@@ -122,11 +144,27 @@
       font-family: 'Press Start 2P', monospace;
       font-size: 0.75rem;
       text-align: left;
-      box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+      box-shadow: 0 0 10px rgba(187, 136, 255, 0.4);
     }
   </style>
 </head>
 <body>
+
+  <!-- 🌌 Stars -->
+  <div class="stars-container">
+    <script>
+      for (let i = 0; i < 100; i++) {
+        const star = document.createElement('div');
+        star.classList.add('star');
+        star.style.left = `${Math.random() * 100}vw`;
+        star.style.top = `${Math.random() * 100}vh`;
+        star.style.animationDuration = `${2 + Math.random() * 3}s`;
+        star.style.animationDelay = `${Math.random() * 5}s`;
+        document.currentScript.parentElement.appendChild(star);
+      }
+    </script>
+  </div>
+
   <div class="box">
     <h1>🔐 Multi Cipher Tool</h1>
     <label for="message">Message:</label>
@@ -147,87 +185,7 @@
     <pre id="brute-output"></pre>
   </div>
 
+  <!-- 🔐 Cipher Scripts -->
   <script src="script.js"></script>
-  <script>
-    function encodeBase64() {
-      const input = document.getElementById("message").value;
-      try {
-        document.getElementById("result").value = btoa(input);
-        document.getElementById("brute-output").textContent = "";
-      } catch {
-        document.getElementById("result").value = "Invalid input for Base64 encoding.";
-      }
-    }
-
-    function encryptCaesar() {
-      const text = document.getElementById("message").value;
-      const shift = 3;
-      document.getElementById("result").value = caesar(text, -shift);
-      document.getElementById("brute-output").textContent = "";
-    }
-
-    function encodeMorse() {
-      const morseCode = {"A":".-","B":"-...","C":"-.-.","D":"-..","E":".","F":"..-.",
-        "G":"--.","H":"....","I":"..","J":".---","K":"-.-","L":".-..",
-        "M":"--","N":"-.","O":"---","P":".--.","Q":"--.-","R":".-.",
-        "S":"...","T":"-","U":"..-","V":"...-","W":".--","X":"-..-",
-        "Y":"-.--","Z":"--..","0":"-----","1":".----","2":"..---",
-        "3":"...--","4":"....-","5":".....","6":"-....","7":"--...",
-        "8":"---..","9":"----."," ":"/"};
-      const input = document.getElementById("message").value.toUpperCase();
-      const result = input.split('').map(c => morseCode[c]||'?').join(' ');
-      document.getElementById("result").value = result;
-      document.getElementById("brute-output").textContent = "";
-    }
-
-    function decodeMorse(text) {
-      const map = {".-":"A","-...":"B","-.-.":"C","-..":"D",".":"E","..-.":"F",
-        "--.":"G","....":"H","..":"I",".---":"J","-.-":"K",".-..":"L",
-        "--":"M","-.":"N","---":"O",".--.":"P","--.-":"Q",".-.":"R",
-        "...":"S","-":"T","..-":"U","...-":"V",".--":"W","-..-":"X",
-        "-.--":"Y","--..":"Z","-----":"0",".----":"1","..---":"2",
-        "...--":"3","....-":"4",".....":"5","-....":"6","--...":"7",
-        "---..":"8","----.":"9","/":" "};
-      return text.split('   ').map(w => w.split(' ').map(s => map[s]||s).join('')).join(' ');
-    }
-
-    function caesar(str, shift) {
-      return str.split('').map(c => {
-        if (/[a-z]/i.test(c)) {
-          const code = c.charCodeAt(0);
-          const base = code < 97 ? 65 : 97;
-          return String.fromCharCode((code - base - shift + 26) % 26 + base);
-        }
-        return c;
-      }).join('');
-    }
-
-    function analyzeAndDecrypt() {
-      const inp = document.getElementById("message").value;
-      const morseMatch = inp.match(/[-\.\/ ]{5,}/);
-      let output = '';
-      let brute = '';
-      if (morseMatch) output += 'Morse: ' + decodeMorse(morseMatch[0].trim()) + '\n';
-      const textOnly = inp.replace(/[-\.\/ ]{2,}/g,'').trim();
-      for (let s=1; s<26; s++) brute += `Shift ${s}: ${caesar(textOnly,s)}\n`;
-      document.getElementById("result").value = output.trim();
-      document.getElementById("brute-output").textContent = brute;
-    }
-
-    function playMorse() {
-      const code = document.getElementById("message").value.match(/[-\.\/ ]{5,}/);
-      if (!code) return alert('No Morse code found.');
-      const ctx = new (window.AudioContext||window.webkitAudioContext)();
-      const unit=0.1; let t=ctx.currentTime;
-      const beep = d => { const o=ctx.createOscillator(),g=ctx.createGain(); o.connect(g);g.connect(ctx.destination);
-        o.frequency.value=750; g.gain.setValueAtTime(1,t); o.start(t); o.stop(t+d); t+=d+unit; };
-      for (const ch of code[0]) {
-        if (ch==='.') beep(unit);
-        else if (ch==='-') beep(3*unit);
-        else if (ch===' ') t+=2*unit;
-        else if (ch==='/') t+=4*unit;
-      }
-    }
-  </script>
 </body>
 </html>
