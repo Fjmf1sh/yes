@@ -162,6 +162,7 @@
   <script src="script.js"></script>
 <script>
 const BASE_URL = "https://some-api-compat-thing.onrender.com";
+let userHasVoted = false; // tracks local voting state
 
 function loadActivePoll() {
   fetch(`${BASE_URL}/api/current-poll`, { credentials: "include" })
@@ -174,21 +175,12 @@ function loadActivePoll() {
       }
 
       let html = `<strong>${data.question}</strong><br><br>`;
-
-      if (data.alreadyVoted) {
-        html += `<div style="margin-bottom: 1em; font-size: 10px; color: gray;"><i>You've already voted.</i></div>`;
-      }
-
       for (const option of data.options) {
-        html += `<button 
-            onclick="voteOption('${option}', this)" 
-            style="margin: 4px 0; padding: 4px 10px; width: 100%; 
-                   background: #bb88ff; color: black; border: none; 
-                   border-radius: 8px; font-family: 'Press Start 2P'; 
-                   font-size: 10px; cursor: pointer;"
-            ${data.alreadyVoted ? 'disabled' : ''}>
-            ${option}
-          </button><br>`;
+        if (userHasVoted) {
+          html += `<button disabled style="margin: 4px 0; padding: 4px 10px; width: 100%; background: #444; color: gray; border: none; border-radius: 8px; font-family: 'Press Start 2P'; font-size: 10px; cursor: not-allowed;">${option}</button><br>`;
+        } else {
+          html += `<button onclick="voteOption('${option}', this)" style="margin: 4px 0; padding: 4px 10px; width: 100%; background: #bb88ff; color: black; border: none; border-radius: 8px; font-family: 'Press Start 2P'; font-size: 10px; cursor: pointer;">${option}</button><br>`;
+        }
       }
 
       html += `<div style="margin-top: 1em; font-size: 10px;"><u>Live Results:</u></div><br>`;
@@ -199,11 +191,18 @@ function loadActivePoll() {
       liveDiv.innerHTML = html;
     })
     .catch(() => {
-      document.getElementById("live-poll").innerText = "⚠️ Failed to load active p
-
+      document.getElementById("live-poll").innerText = "⚠️ Failed to load active poll";
+    });
+}
 
 function voteOption(option, btn) {
-  if (btn) btn.disabled = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "✅ Voted";
+    btn.style.background = "#888";
+    btn.style.cursor = "not-allowed";
+  }
+
   fetch(`${BASE_URL}/api/vote`, {
     method: "POST",
     credentials: "include",
@@ -214,10 +213,12 @@ function voteOption(option, btn) {
     .then(({ status, data }) => {
       if (status === 403) {
         alert("🚫 You have already voted.");
+        userHasVoted = true;
       } else if (!data.success) {
         alert("❌ Vote failed: " + (data.error || "Unknown error"));
       } else {
-        loadActivePoll();
+        userHasVoted = true;
+        loadActivePoll(); // refresh with buttons disabled
       }
     })
     .catch(() => {
@@ -235,6 +236,7 @@ function loadLastPoll() {
         div.innerHTML = "<i>No previous poll</i>";
         return;
       }
+
       const title = `<strong>${last.question}</strong>`;
       const votes = Object.entries(last.results).map(([opt, count]) => `${opt}: <b>${count}</b>`).join("<br>");
       const total = `<small>Total votes: ${last.total_votes}</small>`;
