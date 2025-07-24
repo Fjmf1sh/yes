@@ -100,23 +100,24 @@
       overflow: hidden;
     }
 
-    #poll-container {
-      position: fixed;
-      top: 3em;
-      right: 2em;
-      width: 300px;
-      max-height: 90vh;
-      overflow-y: auto;
-      padding: 1em;
-      background: rgba(0, 0, 0, 0.8);
-      box-shadow: 0 0 20px #bb88ff;
-      border-radius: 15px;
-      font-family: 'Press Start 2P', monospace;
-      font-size: 10px;
-      color: white;
-      z-index: 9999;
-      text-align: left;
-    }
+#poll-container {
+  position: fixed;
+  top: 50%;
+  right: 2em;
+  transform: translateY(-50%);
+  width: 300px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1em;
+  background: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 0 25px rgba(187, 136, 255, 0.4);
+  border-radius: 15px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: white;
+  z-index: 9999;
+  text-align: left;
+}
 
     #poll-container h3 {
       color: #bb88ff;
