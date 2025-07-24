@@ -22,26 +22,25 @@
       padding: 0;
     }
 
-    html, body {
-      background: black;
-      font-family: 'Press Start 2P', 'Segoe UI', sans-serif;
-      color: #bb88ff;
-      text-align: center;
-      padding: 2em 1em;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+html, body {
+  background: black;
+  font-family: 'Press Start 2P', 'Segoe UI', sans-serif;
+  color: #bb88ff;
+  text-align: center;
+  height: 100dvh; /* viewport safe on mobile */
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; /* prevent scroll bar when not needed */
+}
 
-    @media (max-height: 750px), (max-width: 500px) {
-      html, body {
-        display: block;
-        overflow-y: auto;
-        padding-top: 3em;
-      }
-    }
-
+@media (max-height: 750px), (max-width: 500px) {
+  html, body {
+    display: block;
+    overflow-y: auto; /* only scroll when needed */
+  }
+}
     .star {
       position: absolute;
       width: 2px;
@@ -67,16 +66,19 @@
       pointer-events: none;
     }
 
-    .box {
-      position: relative;
-      z-index: 1;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 2em;
-      border-radius: 15px;
-      width: 100%;
-      max-width: 500px;
-      box-shadow: 0 0 20px rgba(187, 136, 255, 0.4);
-    }
+.box {
+  position: relative;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 2em 1em; /* moved padding here */
+  border-radius: 15px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 0 20px rgba(187, 136, 255, 0.4);
+  margin: auto;
+  overflow-y: auto;
+}
+
 
     h1 {
       color: #bb88ff;
