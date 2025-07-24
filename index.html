@@ -164,41 +164,89 @@
     </div>
   </div>
 
-  <!-- Polls Sidebar -->
-  <div id="poll-container">
-    <h3>🗳️ Recent Polls</h3>
-    <div id="poll-list">Loading...</div>
-  </div>
+<!-- Polls Sidebar -->
+<div id="poll-container">
+  <h3>🗳️ Active Poll</h3>
+  <div id="live-poll">Loading...</div>
+  <hr style="margin: 1em 0; border-color: #bb88ff;">
+  <h3>📊 Past Polls</h3>
+  <div id="poll-list">Loading...</div>
+</div>
 
   <!-- Scripts -->
   <script src="script.js"></script>
-  <script>
-    function formatPoll(poll) {
-      const title = `<strong>${poll.question}</strong>`;
-      const votes = Object.entries(poll.results)
-        .map(([opt, count]) => `${opt}: <b>${count}</b>`)
-        .join("<br>");
-      const total = `<small>Total votes: ${poll.total_votes}</small>`;
-      return `<div style="margin-bottom: 1em; background: rgba(255,255,255,0.05); padding: 0.8em; border-radius: 10px; box-shadow: 0 0 8px #bb88ff;">${title}<br>${votes}<br>${total}</div>`;
-    }
+<script>
+function loadActivePoll() {
+  fetch("https://some-api-compat-thing.onrender.com/api/current-poll")
+    .then(res => res.json())
+    .then(data => {
+      const liveDiv = document.getElementById("live-poll");
+      if (!data.question || data.options.length === 0) {
+        liveDiv.innerHTML = "<i>No active poll</i>";
+        return;
+      }
 
-    function loadPolls() {
-      fetch("https://some-api-compat-thing.onrender.com/api/poll-history")
-        .then(res => res.json())
-        .then(data => {
-          const container = document.getElementById("poll-list");
-          if (!container) return;
-          const html = data.polls.reverse().map(formatPoll).join("");
-          container.innerHTML = html || "<i>No recent polls found.</i>";
-        })
-        .catch(err => {
-          console.error("Error fetching polls:", err);
-          document.getElementById("poll-list").innerText = "⚠️ Error loading polls";
-        });
-    }
+      let html = `<strong>${data.question}</strong><br><br>`;
+      for (const option of data.options) {
+        html += `<button onclick="voteOption('${option}')" style="margin: 4px 0; padding: 4px 10px; width: 100%; background: #bb88ff; color: black; border: none; border-radius: 8px; font-family: 'Press Start 2P'; font-size: 10px; cursor: pointer;">${option}</button><br>`;
+      }
 
-    setInterval(loadPolls, 5000);
-    window.onload = loadPolls;
-  </script>
+      html += `<br><u style="font-size: 10px;">Live Results:</u><br>`;
+      for (const [opt, count] of Object.entries(data.votes)) {
+        html += `${opt}: <b>${count}</b><br>`;
+      }
+
+      liveDiv.innerHTML = html;
+    })
+    .catch(() => {
+      document.getElementById("live-poll").innerText = "⚠️ Failed to load active poll";
+    });
+}
+
+function voteOption(option) {
+  fetch("https://some-api-compat-thing.onrender.com/api/vote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ choice: option })
+  }).then(() => {
+    loadActivePoll(); // Refresh results
+  });
+}
+
+function formatPoll(poll) {
+  const title = `<strong>${poll.question}</strong>`;
+  const votes = Object.entries(poll.results)
+    .map(([opt, count]) => `${opt}: <b>${count}</b>`)
+    .join("<br>");
+  const total = `<small>Total votes: ${poll.total_votes}</small>`;
+  return `<div style="margin-bottom: 1em; background: rgba(255,255,255,0.05); padding: 0.8em; border-radius: 10px; box-shadow: 0 0 8px #bb88ff;">${title}<br>${votes}<br>${total}</div>`;
+}
+
+function loadPollHistory() {
+  fetch("https://some-api-compat-thing.onrender.com/api/poll-history")
+    .then(res => res.json())
+    .then(data => {
+      const container = document.getElementById("poll-list");
+      if (!container) return;
+      const html = data.polls.reverse().map(formatPoll).join("");
+      container.innerHTML = html || "<i>No recent polls found.</i>";
+    })
+    .catch(err => {
+      console.error("Error fetching polls:", err);
+      document.getElementById("poll-list").innerText = "⚠️ Error loading polls";
+    });
+}
+
+setInterval(() => {
+  loadActivePoll();
+  loadPollHistory();
+}, 5000);
+
+window.onload = () => {
+  loadActivePoll();
+  loadPollHistory();
+};
+</script>
+
 </body>
 </html>
