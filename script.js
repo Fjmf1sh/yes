@@ -13,6 +13,7 @@ banner.style.textAlign = "center";
 banner.style.display = "none";
 banner.style.textShadow = "0 0 8px white";
 banner.style.boxShadow = "0 0 20px #bb88ff";
+banner.style.transition = "transform 0.2s ease-in-out";
 
 document.body.prepend(banner);
 
@@ -20,7 +21,7 @@ async function checkStatus() {
   try {
     const res = await fetch("https://some-api-compat-thing.onrender.com/api/status");
     const data = await res.json();
-    
+
     if (!data.access) {
       document.body.innerHTML = `
         <style>
@@ -35,7 +36,6 @@ async function checkStatus() {
         <h1>🚫 ACCESS DENIED</h1>
         <p>This page is currently unavailable.</p>
       `;
-      return;
     }
   } catch (err) {
     console.error("Status check failed:", err);
@@ -45,25 +45,25 @@ async function checkStatus() {
 checkStatus();
 setInterval(checkStatus, 3000);
 
+let lastMessage = "";
+
 setInterval(() => {
   fetch('https://some-api-compat-thing.onrender.com/api/client-poll')
-    .then((res) => {
-      if (res.ok) {
-        return res.json();
-      } else {
-        throw new Error("Fetch failed with status: " + res.status);
-      }
-    })
+    .then((res) => res.ok ? res.json() : Promise.reject("Failed: " + res.status))
     .then((json) => {
-      if (json.message.trim().length >= 1) {
-        banner.innerText = json.message.trim();
+      const msg = json.message.trim();
+      if (msg.length >= 1 && msg !== lastMessage) {
+        banner.innerText = msg;
         banner.style.display = 'block';
-      } else {
-        banner.innerText = "";
+        banner.style.transform = 'scale(1.03)';
+        setTimeout(() => {
+          banner.style.transform = 'scale(1)';
+        }, 150);
+        lastMessage = msg;
+      } else if (msg.length === 0) {
         banner.style.display = 'none';
+        lastMessage = "";
       }
     })
-    .catch((err) => {
-      console.error("Error during fetch:", err);
-    });
+    .catch((err) => console.error("Error during fetch:", err));
 }, 3000);
