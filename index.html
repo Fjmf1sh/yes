@@ -175,6 +175,8 @@
 
   <!-- Scripts -->
   <script src="script.js"></script>
+<!-- Scripts -->
+<script src="script.js"></script>
 <script>
 function loadActivePoll() {
   fetch("https://some-api-compat-thing.onrender.com/api/current-poll")
@@ -188,10 +190,10 @@ function loadActivePoll() {
 
       let html = `<strong>${data.question}</strong><br><br>`;
       for (const option of data.options) {
-        html += `<button onclick="voteOption('${option}')" style="margin: 4px 0; padding: 4px 10px; width: 100%; background: #bb88ff; color: black; border: none; border-radius: 8px; font-family: 'Press Start 2P'; font-size: 10px; cursor: pointer;">${option}</button><br>`;
+        html += `<button onclick="voteOption('${option}', this)" style="margin: 4px 0; padding: 4px 10px; width: 100%; background: #bb88ff; color: black; border: none; border-radius: 8px; font-family: 'Press Start 2P'; font-size: 10px; cursor: pointer;">${option}</button><br>`;
       }
 
-      html += `<br><u style="font-size: 10px;">Live Results:</u><br>`;
+      html += `<div style="margin-top: 1em; font-size: 10px;"><u>Live Results:</u></div><br>`;
       for (const [opt, count] of Object.entries(data.votes)) {
         html += `${opt}: <b>${count}</b><br>`;
       }
@@ -203,14 +205,27 @@ function loadActivePoll() {
     });
 }
 
-function voteOption(option) {
+function voteOption(option, btn) {
+  if (btn) btn.disabled = true;
+
   fetch("https://some-api-compat-thing.onrender.com/api/vote", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ choice: option })
-  }).then(() => {
-    loadActivePoll();
-  });
+  })
+    .then(res => res.json().then(data => ({ status: res.status, data })))
+    .then(({ status, data }) => {
+      if (status === 403) {
+        alert("🚫 You have already voted from this IP.");
+      } else if (!data.success) {
+        alert("❌ Vote failed: " + (data.error || "Unknown error"));
+      } else {
+        loadActivePoll(); // Refresh results
+      }
+    })
+    .catch(() => {
+      alert("⚠️ Network error. Try again.");
+    });
 }
 
 function loadLastPoll() {
@@ -229,13 +244,14 @@ function loadLastPoll() {
         .map(([opt, count]) => `${opt}: <b>${count}</b>`)
         .join("<br>");
       const total = `<small>Total votes: ${last.total_votes}</small>`;
-      div.innerHTML = `<div style="margin-bottom: 1em; background: rgba(255,255,255,0.05); padding: 0.8em; border-radius: 10px; box-shadow: 0 0 8px #bb88ff;">${title}<br>${votes}<br>${total}</div>`;
+      div.innerHTML = `<div style="margin-bottom: 1em; background: rgba(255,255,255,0.05); padding: 0.8em; border-radius: 10px; box-shadow: 0 0 8px #bb88ff;">${title}<br><br>${votes}<br><br>${total}</div>`;
     })
     .catch(() => {
       document.getElementById("last-poll").innerText = "⚠️ Error loading last poll";
     });
 }
 
+// Refresh polls every 5 seconds
 setInterval(() => {
   loadActivePoll();
   loadLastPoll();
@@ -246,6 +262,5 @@ window.onload = () => {
   loadLastPoll();
 };
 </script>
-
 </body>
 </html>
