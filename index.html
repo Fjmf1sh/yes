@@ -172,20 +172,35 @@ function loadActivePoll() {
         liveDiv.innerHTML = "<i>No active poll</i>";
         return;
       }
+
       let html = `<strong>${data.question}</strong><br><br>`;
-      for (const option of data.options) {
-        html += `<button onclick="voteOption('${option}', this)" style="margin: 4px 0; padding: 4px 10px; width: 100%; background: #bb88ff; color: black; border: none; border-radius: 8px; font-family: 'Press Start 2P'; font-size: 10px; cursor: pointer;">${option}</button><br>`;
+
+      if (data.alreadyVoted) {
+        html += `<div style="margin-bottom: 1em; font-size: 10px; color: gray;"><i>You've already voted.</i></div>`;
       }
+
+      for (const option of data.options) {
+        html += `<button 
+            onclick="voteOption('${option}', this)" 
+            style="margin: 4px 0; padding: 4px 10px; width: 100%; 
+                   background: #bb88ff; color: black; border: none; 
+                   border-radius: 8px; font-family: 'Press Start 2P'; 
+                   font-size: 10px; cursor: pointer;"
+            ${data.alreadyVoted ? 'disabled' : ''}>
+            ${option}
+          </button><br>`;
+      }
+
       html += `<div style="margin-top: 1em; font-size: 10px;"><u>Live Results:</u></div><br>`;
       for (const [opt, count] of Object.entries(data.votes)) {
         html += `${opt}: <b>${count}</b><br>`;
       }
+
       liveDiv.innerHTML = html;
     })
     .catch(() => {
-      document.getElementById("live-poll").innerText = "⚠️ Failed to load active poll";
-    });
-}
+      document.getElementById("live-poll").innerText = "⚠️ Failed to load active p
+
 
 function voteOption(option, btn) {
   if (btn) btn.disabled = true;
