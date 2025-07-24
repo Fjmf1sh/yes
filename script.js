@@ -3,13 +3,16 @@ banner.id = "live-banner";
 banner.style.cssText = `
   background: #bb88ff;
   color: white;
-  font-family: 'Press Start 2P';
+  font-family: 'Press Start 2P', monospace;
   padding: 1em;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 999;
+  text-align: center;
+  text-shadow: 0 0 8px white;
+  box-shadow: 0 0 15px #bb88ff;
 `;
 banner.style.display = 'none';
 document.body.prepend(banner);
