@@ -22,26 +22,27 @@
       padding: 0;
     }
 
-html, body {
-  background: black;
-  font-family: 'Press Start 2P', 'Segoe UI', sans-serif;
-  color: #bb88ff;
-  text-align: center;
-  height: 100dvh;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
+    html, body {
+      background: black;
+      font-family: 'Press Start 2P', 'Segoe UI', sans-serif;
+      color: #bb88ff;
+      text-align: center;
+      height: 100dvh;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
 
-@media (max-height: 750px), (max-width: 500px) {
-  html, body {
-    display: block;
-    overflow-y: auto;
-  }
-}
+    @media (max-height: 750px), (max-width: 500px) {
+      html, body {
+        display: block;
+        overflow-y: auto;
+      }
+    }
+
     .star {
       position: absolute;
       width: 2px;
@@ -67,17 +68,17 @@ html, body {
       pointer-events: none;
     }
 
-.box {
-  background: rgba(0, 0, 0, 0.85);
-  box-shadow: 0 0 25px rgba(187, 136, 255, 0.4);
-  border-radius: 15px;
-  padding: 2em 1em;
-  max-width: 500px;
-  width: calc(100% - 2em);
-  margin: 1em auto;
-  z-index: 1;
-  position: relative;
-}
+    .box {
+      background: rgba(0, 0, 0, 0.85);
+      box-shadow: 0 0 25px rgba(187, 136, 255, 0.4);
+      border-radius: 15px;
+      padding: 2em 1em;
+      max-width: 500px;
+      width: calc(100% - 2em);
+      margin: 1em auto;
+      z-index: 1;
+      position: relative;
+    }
 
     h1 {
       color: #bb88ff;
@@ -126,8 +127,6 @@ html, body {
   </style>
 </head>
 <body>
-
-  <!-- Starfield -->
   <div class="stars-container">
     <script>
       for (let i = 0; i < 100; i++) {
@@ -142,7 +141,6 @@ html, body {
     </script>
   </div>
 
-  <!-- Main Content -->
   <div class="box">
     <h1>🧭 F1sh 🧭</h1>
     <div class="nav">
@@ -152,8 +150,6 @@ html, body {
       <a href="page4.html">😶‍🌫️ Permutations</a>
       <a href="page5.html">🕶️ Binary</a>
     </div>
-
-    <!-- Polls Merged Here -->
     <div id="poll-wrapper">
       <h3>🗳️ Active Poll</h3>
       <div id="live-poll">Loading...</div>
@@ -163,13 +159,12 @@ html, body {
     </div>
   </div>
 
-<!-- Scripts -->
-<script src="script.js"></script>
+  <script src="script.js"></script>
 <script>
+const BASE_URL = "https://some-api-compat-thing.onrender.com";
+
 function loadActivePoll() {
-  fetch("https://fjmf1sh.click/api/current-poll", {
-    credentials: "include"
-  })
+  fetch(`${BASE_URL}/api/current-poll`, { credentials: "include" })
     .then(res => res.json())
     .then(data => {
       const liveDiv = document.getElementById("live-poll");
@@ -177,17 +172,14 @@ function loadActivePoll() {
         liveDiv.innerHTML = "<i>No active poll</i>";
         return;
       }
-
       let html = `<strong>${data.question}</strong><br><br>`;
       for (const option of data.options) {
         html += `<button onclick="voteOption('${option}', this)" style="margin: 4px 0; padding: 4px 10px; width: 100%; background: #bb88ff; color: black; border: none; border-radius: 8px; font-family: 'Press Start 2P'; font-size: 10px; cursor: pointer;">${option}</button><br>`;
       }
-
       html += `<div style="margin-top: 1em; font-size: 10px;"><u>Live Results:</u></div><br>`;
       for (const [opt, count] of Object.entries(data.votes)) {
         html += `${opt}: <b>${count}</b><br>`;
       }
-
       liveDiv.innerHTML = html;
     })
     .catch(() => {
@@ -197,10 +189,9 @@ function loadActivePoll() {
 
 function voteOption(option, btn) {
   if (btn) btn.disabled = true;
-
-  fetch("https://fjmf1sh.click/api/vote", {
+  fetch(`${BASE_URL}/api/vote`, {
     method: "POST",
-    credentials: "include", // 👈 Allows backend to send cookies
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ choice: option })
   })
@@ -211,7 +202,7 @@ function voteOption(option, btn) {
       } else if (!data.success) {
         alert("❌ Vote failed: " + (data.error || "Unknown error"));
       } else {
-        loadActivePoll(); // Refresh results
+        loadActivePoll();
       }
     })
     .catch(() => {
@@ -220,9 +211,7 @@ function voteOption(option, btn) {
 }
 
 function loadLastPoll() {
-  fetch("https://fjmf1sh.click/api/poll-history", {
-    credentials: "include"
-  })
+  fetch(`${BASE_URL}/api/poll-history`, { credentials: "include" })
     .then(res => res.json())
     .then(data => {
       const last = data.polls?.[data.polls.length - 1];
@@ -231,11 +220,8 @@ function loadLastPoll() {
         div.innerHTML = "<i>No previous poll</i>";
         return;
       }
-
       const title = `<strong>${last.question}</strong>`;
-      const votes = Object.entries(last.results)
-        .map(([opt, count]) => `${opt}: <b>${count}</b>`)
-        .join("<br>");
+      const votes = Object.entries(last.results).map(([opt, count]) => `${opt}: <b>${count}</b>`).join("<br>");
       const total = `<small>Total votes: ${last.total_votes}</small>`;
       div.innerHTML = `<div style="margin-bottom: 1em; background: rgba(255,255,255,0.05); padding: 0.8em; border-radius: 10px; box-shadow: 0 0 8px #bb88ff;">${title}<br><br>${votes}<br><br>${total}</div>`;
     })
@@ -244,7 +230,6 @@ function loadLastPoll() {
     });
 }
 
-// Refresh polls every 5 seconds
 setInterval(() => {
   loadActivePoll();
   loadLastPoll();
@@ -254,7 +239,6 @@ window.onload = () => {
   loadActivePoll();
   loadLastPoll();
 };
-
 </script>
 </body>
 </html>
