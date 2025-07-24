@@ -164,13 +164,13 @@
     </div>
   </div>
 
-<!-- Polls Sidebar -->
+  <!-- Polls Sidebar -->
 <div id="poll-container">
   <h3>🗳️ Active Poll</h3>
   <div id="live-poll">Loading...</div>
   <hr style="margin: 1em 0; border-color: #bb88ff;">
-  <h3>📊 Past Polls</h3>
-  <div id="poll-list">Loading...</div>
+  <h3>📊 Last Poll</h3>
+  <div id="last-poll">Loading...</div>
 </div>
 
   <!-- Scripts -->
@@ -209,42 +209,41 @@ function voteOption(option) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ choice: option })
   }).then(() => {
-    loadActivePoll(); // Refresh results
+    loadActivePoll();
   });
 }
 
-function formatPoll(poll) {
-  const title = `<strong>${poll.question}</strong>`;
-  const votes = Object.entries(poll.results)
-    .map(([opt, count]) => `${opt}: <b>${count}</b>`)
-    .join("<br>");
-  const total = `<small>Total votes: ${poll.total_votes}</small>`;
-  return `<div style="margin-bottom: 1em; background: rgba(255,255,255,0.05); padding: 0.8em; border-radius: 10px; box-shadow: 0 0 8px #bb88ff;">${title}<br>${votes}<br>${total}</div>`;
-}
-
-function loadPollHistory() {
+function loadLastPoll() {
   fetch("https://some-api-compat-thing.onrender.com/api/poll-history")
     .then(res => res.json())
     .then(data => {
-      const container = document.getElementById("poll-list");
-      if (!container) return;
-      const html = data.polls.reverse().map(formatPoll).join("");
-      container.innerHTML = html || "<i>No recent polls found.</i>";
+      const last = data.polls?.[data.polls.length - 1];
+      const div = document.getElementById("last-poll");
+      if (!last) {
+        div.innerHTML = "<i>No previous poll</i>";
+        return;
+      }
+
+      const title = `<strong>${last.question}</strong>`;
+      const votes = Object.entries(last.results)
+        .map(([opt, count]) => `${opt}: <b>${count}</b>`)
+        .join("<br>");
+      const total = `<small>Total votes: ${last.total_votes}</small>`;
+      div.innerHTML = `<div style="margin-bottom: 1em; background: rgba(255,255,255,0.05); padding: 0.8em; border-radius: 10px; box-shadow: 0 0 8px #bb88ff;">${title}<br>${votes}<br>${total}</div>`;
     })
-    .catch(err => {
-      console.error("Error fetching polls:", err);
-      document.getElementById("poll-list").innerText = "⚠️ Error loading polls";
+    .catch(() => {
+      document.getElementById("last-poll").innerText = "⚠️ Error loading last poll";
     });
 }
 
 setInterval(() => {
   loadActivePoll();
-  loadPollHistory();
+  loadLastPoll();
 }, 5000);
 
 window.onload = () => {
   loadActivePoll();
-  loadPollHistory();
+  loadLastPoll();
 };
 </script>
 
