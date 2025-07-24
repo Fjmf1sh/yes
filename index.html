@@ -27,18 +27,19 @@ html, body {
   font-family: 'Press Start 2P', 'Segoe UI', sans-serif;
   color: #bb88ff;
   text-align: center;
-  height: 100dvh; /* viewport safe on mobile */
+  height: 100dvh;
   margin: 0;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden; /* prevent scroll bar when not needed */
+  overflow: hidden;
 }
 
 @media (max-height: 750px), (max-width: 500px) {
   html, body {
     display: block;
-    overflow-y: auto; /* only scroll when needed */
+    overflow-y: auto;
   }
 }
     .star {
@@ -67,18 +68,16 @@ html, body {
     }
 
 .box {
-  position: relative;
-  z-index: 1;
-  background: rgba(0, 0, 0, 0.8);
-  padding: 2em 1em; /* moved padding here */
+  background: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 0 25px #bb88ff;
   border-radius: 15px;
-  width: 100%;
+  padding: 2em 1em;
   max-width: 500px;
-  box-shadow: 0 0 20px rgba(187, 136, 255, 0.4);
-  margin: auto;
-  overflow-y: auto;
+  width: calc(100% - 2em);
+  margin: 1em auto;
+  z-index: 1;
+  position: relative;
 }
-
 
     h1 {
       color: #bb88ff;
