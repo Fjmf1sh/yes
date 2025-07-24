@@ -162,16 +162,24 @@
   <script src="script.js"></script>
 <script>
 const BASE_URL = "https://some-api-compat-thing.onrender.com";
-let userHasVoted = false; // tracks local voting state
+let userHasVoted = false;
+let lastPollId = null;
 
 function loadActivePoll() {
   fetch(`${BASE_URL}/api/current-poll`, { credentials: "include" })
     .then(res => res.json())
     .then(data => {
       const liveDiv = document.getElementById("live-poll");
+
       if (!data.question || data.options.length === 0) {
         liveDiv.innerHTML = "<i>No active poll</i>";
         return;
+      }
+
+      // Reset vote state if it's a new poll
+      if (data.id !== lastPollId) {
+        userHasVoted = false;
+        lastPollId = data.id;
       }
 
       let html = `<strong>${data.question}</strong><br><br>`;
@@ -218,7 +226,7 @@ function voteOption(option, btn) {
         alert("❌ Vote failed: " + (data.error || "Unknown error"));
       } else {
         userHasVoted = true;
-        loadActivePoll(); // refresh with buttons disabled
+        loadActivePoll();
       }
     })
     .catch(() => {
@@ -230,7 +238,7 @@ function loadLastPoll() {
   fetch(`${BASE_URL}/api/poll-history`, { credentials: "include" })
     .then(res => res.json())
     .then(data => {
-      const last = data.polls?.[data.polls.length - 1];
+      const last = data.polls?.[0];  // FIXED: was .at(-1) before
       const div = document.getElementById("last-poll");
       if (!last) {
         div.innerHTML = "<i>No previous poll</i>";
@@ -256,6 +264,7 @@ window.onload = () => {
   loadActivePoll();
   loadLastPoll();
 };
+
 </script>
 </body>
 </html>
