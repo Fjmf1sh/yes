@@ -8,6 +8,8 @@
   :root{ color-scheme: dark; }
   html,body{height:100%;margin:0;background:#090c10;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
   canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+  /* Optional: prevent long-press text selection on mobile */
+  *{ -webkit-tap-highlight-color: transparent; user-select: none; }
 </style>
 </head>
 <body>
@@ -16,7 +18,7 @@
 (function(){
   'use strict';
   const CANVAS = document.getElementById('game');
-  const CTX = CANVAS.getContext('2d');
+  const CTX = CANVAS.getContext('2d', { alpha: false });
   let DPR = Math.max(1, Math.min(3, (window.devicePixelRatio||1)));
 
   // ===== Utilities =====
@@ -34,24 +36,35 @@
   // ===== Canvas sizing =====
   function resize(){
     DPR = Math.max(1, Math.min(3, (window.devicePixelRatio||1)));
-    const w = CANVAS.clientWidth * DPR;
-    const h = CANVAS.clientHeight * DPR;
+    const w = Math.max(320, Math.floor(CANVAS.clientWidth * DPR));
+    const h = Math.max(320, Math.floor(CANVAS.clientHeight * DPR));
     if(CANVAS.width!==w||CANVAS.height!==h){ CANVAS.width = w; CANVAS.height = h; }
   }
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', resize, { passive: true });
   resize();
 
-  // ===== Input =====
+  // ===== Input (pointer-first; fallback to mouse/touch/click) =====
   const input = {mx:0,my:0, down:false, wheel:0};
   let prevDown=false;
   function canvasPos(evt){ const r = CANVAS.getBoundingClientRect(); return {x:(evt.clientX-r.left)*DPR, y:(evt.clientY-r.top)*DPR}; }
-  CANVAS.addEventListener('mousemove', e=>{const p=canvasPos(e);input.mx=p.x;input.my=p.y;});
-  CANVAS.addEventListener('mousedown', e=>{const p=canvasPos(e);input.mx=p.x;input.my=p.y;input.down=true;});
-  CANVAS.addEventListener('mouseup', e=>{input.down=false;});
-  CANVAS.addEventListener('wheel', e=>{input.wheel += e.deltaY;});
-  CANVAS.addEventListener('touchstart', e=>{const t=e.changedTouches[0]; const r=CANVAS.getBoundingClientRect(); input.mx=(t.clientX-r.left)*DPR; input.my=(t.clientY-r.top)*DPR; input.down=true; e.preventDefault();},{passive:false});
-  CANVAS.addEventListener('touchmove', e=>{const t=e.changedTouches[0]; const r=CANVAS.getBoundingClientRect(); input.mx=(t.clientX-r.left)*DPR; input.my=(t.clientY-r.top)*DPR;},{passive:true});
-  CANVAS.addEventListener('touchend', e=>{input.down=false;},{passive:true});
+
+  function onPointerMove(e){ const p=canvasPos(e); input.mx=p.x; input.my=p.y; }
+  function onPointerDown(e){ const p=canvasPos(e); input.mx=p.x; input.my=p.y; input.down=true; }
+  function onPointerUp(e){ const p=canvasPos(e); input.mx=p.x; input.my=p.y; input.down=false; dispatchClick(p.x,p.y); }
+
+  if (window.PointerEvent){
+    CANVAS.addEventListener('pointermove', onPointerMove);
+    CANVAS.addEventListener('pointerdown', onPointerDown);
+    CANVAS.addEventListener('pointerup', onPointerUp);
+  } else {
+    CANVAS.addEventListener('mousemove', e=>{const p=canvasPos(e);input.mx=p.x;input.my=p.y;});
+    CANVAS.addEventListener('mousedown', e=>{const p=canvasPos(e);input.mx=p.x;input.my=p.y;input.down=true;});
+    CANVAS.addEventListener('mouseup', e=>{const p=canvasPos(e);input.mx=p.x;input.my=p.y;input.down=false;dispatchClick(p.x,p.y);});
+    CANVAS.addEventListener('touchstart', e=>{const t=e.changedTouches[0]; const r=CANVAS.getBoundingClientRect(); input.mx=(t.clientX-r.left)*DPR; input.my=(t.clientY-r.top)*DPR; input.down=true; e.preventDefault();},{passive:false});
+    CANVAS.addEventListener('touchend', e=>{const t=e.changedTouches[0]; const r=CANVAS.getBoundingClientRect(); const x=(t.clientX-r.left)*DPR, y=(t.clientY-r.top)*DPR; input.down=false; dispatchClick(x,y);},{passive:true});
+  }
+  CANVAS.addEventListener('wheel', e=>{input.wheel += e.deltaY;}, { passive: true });
+
   window.addEventListener('keydown', (e)=>{
     if(state.arcade.active){
       if(state.arcade.mode==='gate' && (e.code==='Space' || e.key===' ')) gateStop();
@@ -87,6 +100,7 @@
   ];
 
   const state = {
+    __version: 2,
     bits:0, bitsTotal:0, lifetimeBits:0,
     rp:0, rpTotal:0,
     clickBase: 1, clickMult: 1, // click = release of pulse
@@ -142,21 +156,29 @@
   ];
 
   // ===== Persistence =====
-  const SAVE_KEY='quantum_forge_v1';
+  const SAVE_KEY=('quantum_forge_v2@'+(location.host||'local'));
   function save(){
     state.lastSave=Date.now();
     const data={...state, mults, mods};
-    try{localStorage.setItem(SAVE_KEY, JSON.stringify(data));}catch{}
+    try{localStorage.setItem(SAVE_KEY, JSON.stringify(data));}catch(e){ console.warn('Save failed', e); }
   }
   function load(){
     try{
       const raw=localStorage.getItem(SAVE_KEY); if(!raw) return; const d=JSON.parse(raw);
-      Object.assign(state, d); if(d.mults) Object.assign(mults,d.mults); if(d.mods) Object.assign(mods,d.mods);
+      // Safe merge
+      const keep = ['bits','bitsTotal','lifetimeBits','rp','rpTotal','clickBase','clickMult','charge','critZone','combo','modules','upgrades','tech','achievements','ascend','settings','lastSave','tab','buyQtyIndex','scroll','glitch','rift','particles','toast','arcade','clickArea','ui'];
+      for(const k of keep){ if(k in d) state[k]=d[k]; }
+      if(d.mults) Object.assign(mults,d.mults);
+      if(d.mods) Object.assign(mods,d.mods);
+      // Offline gains (capped)
       const secs=clamp((Date.now()-(d.lastSave||Date.now()))/1000,0,3600*8);
       const pps=totalPPS(); const off=pps*secs*0.75; if(off>0){ addBits(off); toast(`Offline +${fmt(off)} bits`);} 
-    }catch{}
+    }catch(e){ console.warn('Load failed', e); }
   }
   load();
+  // Save on tab hide/close for hosting
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) save(); }, { passive:true });
+  window.addEventListener('beforeunload', ()=>{ try{ save(); }catch{} });
 
   // ===== Economy =====
   function count(id){ return state.modules[id]?.count||0; }
@@ -188,7 +210,7 @@
   function coreGain(){ return Math.floor(Math.sqrt(state.lifetimeBits/1e6)); }
   function tryAscend(){ const gain=coreGain(); if(gain<=0){ toast('Generate more Bits to ascend'); return; } state.ascend.cores+=gain; state.ascend.best=Math.max(state.ascend.best,state.ascend.cores); // reset
     state.bits=0; state.bitsTotal=0; state.clickBase=1; state.clickMult=1; state.modules=MODULES.map(m=>({id:m.id,count:0})); state.upgrades=[]; state.rp=0; state.tech=[...state.tech];
-    state.glitch={ next: rand(18,40), life:0,x:0,y:0, active:false, value:0}; toast(`Ascended: +${gain} core(s) → global x${(1+state.ascend.cores*0.1).toFixed(2)}`); beep(880,0.07,0.03); save(); }
+    state.glitch={ next: rand(18,40), life:0,x:0,y:0, active:false, value:0}; toast(`Ascended: +${gain} core(s) → global x${(1+state.ascend.cores*0.1).toFixed(2)})`); beep(880,0.07,0.03); save(); }
 
   // ===== Specials =====
   function updateGlitch(dt){ const g=state.glitch; if(g.active){ g.life-=dt; if(g.life<=0) g.active=false; } else { g.next-=dt; if(g.next<=0){ g.active=true; g.life=10; g.x=rand(100,CANVAS.width-100); g.y=rand(120,CANVAS.height-160); g.value=(totalPPS()*rand(8,24) + clickValueFromCharge()*rand(20,60)) * mults.glitch; g.next=rand(32,68);} } }
@@ -381,7 +403,9 @@
     // Header
     CTX.fillStyle='#0f1318'; roundRect(pad,pad,CANVAS.width-pad*2,headerH,14*DPR,true,false);
     CTX.fillStyle='#e6eef6'; CTX.font=`800 ${20*DPR*state.ui.scale}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText('Quantum Forge', pad*2, pad+headerH/2);
-    let xr = CANVAS.width - pad*2 - 100*DPR; pill(xr, pad+headerH/2-10*DPR, `Buy: ${BUY_QTY[state.buyQtyIndex]}`); xr-=150*DPR; pill(xr, pad+headerH/2-10*DPR, `Cores: ${fmt(state.ascend.cores)} (x${(1+state.ascend.cores*0.1).toFixed(2)})`);
+    // Right pills
+    let xr = CANVAS.width - pad*2 - 100*DPR; pill(xr, pad+headerH/2-10*DPR, `Buy: ${BUY_QTY[state.buyQtyIndex]}`); addClick(xr, pad+headerH/2-10*DPR, 100*DPR, 20*DPR, ()=>cycleBuyQty(+1));
+    xr-=150*DPR; pill(xr, pad+headerH/2-10*DPR, `Cores: ${fmt(state.ascend.cores)} (x${(1+state.ascend.cores*0.1).toFixed(2)})`);
     if(compact){
       const bw=36*DPR, bh=32*DPR; const bx=CANVAS.width - pad - bw, by=pad + headerH/2 - bh/2;
       drawButton(bx,by,bw,bh, state.ui.drawerOpen?'✕':'≡', true, true);
@@ -585,19 +609,18 @@
 
   // ===== Click dispatch =====
   function dispatchClick(px,py){
-    // Rift has priority
+    // 0) Rift has priority while open
     if(state.rift.active && tryClickRift(px,py)) return;
-    // UI
+    // 1) UI (buttons, tabs, shop, settings)
     for(let i=clicks.length-1;i>=0;i--){ const c=clicks[i]; if(hit(px,py,c)){ c.onClick(px,py); return; } }
-    // Arcade overlay
+    // 2) Arcade overlay
     if(state.arcade.active){ handleArcadeClick(px,py); return; }
-    // Specials
+    // 3) Specials (glitch last)
     if(tryClickGlitch(px,py)) return;
   }
-  CANVAS.addEventListener('click', (e)=>{ const r=canvasPos(e); dispatchClick(r.x,r.y); });
 
   // ===== Export / Import =====
-  function doExport(){ const data=localStorage.getItem(SAVE_KEY)||JSON.stringify({...state,mults,mods}); if(navigator.clipboard){ navigator.clipboard.writeText(data).then(()=>toast('Save copied')).catch(()=>alert(data)); } else alert(data); }
+  function doExport(){ try{ const data=localStorage.getItem(SAVE_KEY)||JSON.stringify({...state,mults,mods}); if(navigator.clipboard && location.protocol!=='file:'){ navigator.clipboard.writeText(data).then(()=>toast('Save copied')).catch(()=>alert(data)); } else alert(data); }catch(e){ alert('Export failed'); } }
   function doImport(){ const data=prompt('Paste your save data:'); if(!data) return; try{ localStorage.setItem(SAVE_KEY,data); toast('Imported. Reloading…'); setTimeout(()=>location.reload(), 400);}catch{ toast('Import failed'); }}
 
   // ===== Autosave =====
