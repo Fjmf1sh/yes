@@ -1,216 +1,611 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cookie Clicker</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
-    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #2a3b4c; color: #fff; display: flex; flex-direction: column; }
-    #header { background: #1f2a34; display: flex; justify-content: space-between; align-items: center; padding: .5rem 1rem; border-bottom: 4px solid #644a2c; user-select: none; }
-    #header .title { flex: 1; text-align: center; cursor: default; }
-    #header button { background: #644a2c; border: none; color: #fff; padding: .3rem .6rem; cursor: pointer; }
-    #main { flex: 1; display: flex; }
-    .panel { background: #16425b; border: 4px solid #644a2c; display: flex; flex-direction: column; }
-    #cookie-panel { flex: 0 0 20%; min-width: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; position: relative; }
-    #stats-panel { flex: 1; padding: 1rem; overflow-y: auto; background: #6b4226; display: flex; flex-direction: column; gap: 4px; }
-    #store-panel { flex: 0 0 20%; min-width: 200px; padding: 1rem; overflow-y: auto; }
-    #cookie-count { font-size: 1.5rem; margin-bottom: 1rem; text-align: center; }
-    #cookie-btn { font-size: 6rem; background: transparent; border: none; cursor: pointer; }
-    #cursor-orbit { position: absolute; top: 53.6%; left: 50%; width: 200px; height: 200px; transform: translate(-50%, -50%) rotate(0deg); animation: orbit-spin 10s linear infinite; pointer-events: none; }
-    @keyframes orbit-spin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
-    .orbit-icon { position: absolute; font-size: 1.5rem; }
-    .stats-item { display: flex; align-items: center; padding: 1rem; background: #16425b; min-height: 60px; }
-    .stats-item .icon { font-size: 1.5rem; margin-right: .5rem; }
-    .store-item { background: rgba(0,0,0,0.2); margin-bottom: .5rem; padding: .5rem; display: flex; justify-content: space-between; align-items: center; }
-    .store-item button { background: #644a2c; border: none; color: #fff; padding: .3rem .6rem; cursor: pointer; }
-    .store-item button:disabled { opacity: .5; cursor: default; }
-    #cheat-menu { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1f2a34; border: 4px solid #644a2c; padding: 1rem; z-index: 1000; width: 300px; }
-    #cheat-menu h2, #cheat-menu label, #cheat-menu button { margin: .5rem 0; display: block; }
-    #cheat-menu input { margin-left: .5rem; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quantum Forge — Unique Canvas Clicker</title>
+<style>
+  :root{ color-scheme: dark; }
+  html,body{height:100%;margin:0;background:#090c10;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+</style>
 </head>
 <body>
-  <div id="header">
-    <span class="title">You feel like making cookies. But nobody wants to eat your cookies.</span>
-    <button id="reset-btn">Reset</button>
-  </div>
-  <div id="main">
-    <div id="cookie-panel" class="panel">
-      <div id="cookie-count">0 cookies<br><small>per second: <span id="cps">0</span></small></div>
-      <button id="cookie-btn">🍪</button>
-      <div id="cursor-orbit"></div>
-    </div>
-    <div id="stats-panel" class="panel"></div>
-    <div id="store-panel" class="panel"><h3>Store</h3></div>
-  </div>
-  <div id="cheat-menu">
-    <h2>Cheat Menu</h2>
-    <label>Add cookies:<input id="cheat-input" type="number" value="0"/></label>
-    <label>Auto-click:<input id="auto-click-toggle" type="checkbox"/></label>
-    <label>Infinite CPS:<input id="infinite-cps-toggle" type="checkbox"/></label>
-    <button id="cheat-set-btn">Apply</button>
-    <button id="cheat-close-btn">Close</button>
-  </div>
-  <script>
-// ✅ Access check + banner + refresh polling
-fetch("https://some-api-compat-thing.onrender.com/api/status")
-  .then(res => res.json())
-  .then(data => {
-    if (!data.access) {
-      document.body.innerHTML = `
-        <style>
-          body {
-            background-color: black;
-            color: white;
-            font-family: 'Press Start 2P', monospace;
-            text-align: center;
-            padding-top: 20vh;
+<canvas id="game"></canvas>
+<script>
+(function(){
+  'use strict';
+  const CANVAS = document.getElementById('game');
+  const CTX = CANVAS.getContext('2d');
+  let DPR = Math.max(1, Math.min(3, (window.devicePixelRatio||1)));
+
+  // ===== Utilities =====
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const lerp = (a,b,t)=>a+(b-a)*t;
+  const nowMs = ()=>performance.now();
+  const rand= (a,b)=>a+Math.random()*(b-a);
+  const fmt = (n)=>{ if(!isFinite(n)) return '∞'; if(n < 1000) return n.toFixed(n<10?2:n<100?1:0);
+    const U=['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
+    let i=0,x=n; while(x>=1000&&i<U.length-1){x/=1000;i++;}
+    return x.toFixed(x<10?2:x<100?1:0)+U[i];
+  };
+  const measure = (txt, size, weight='600')=>{CTX.font=`${weight} ${size}px Inter,system-ui`;return CTX.measureText(txt).width;};
+
+  // ===== Canvas sizing =====
+  function resize(){
+    DPR = Math.max(1, Math.min(3, (window.devicePixelRatio||1)));
+    const w = CANVAS.clientWidth * DPR;
+    const h = CANVAS.clientHeight * DPR;
+    if(CANVAS.width!==w||CANVAS.height!==h){ CANVAS.width = w; CANVAS.height = h; }
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ===== Input =====
+  const input = {mx:0,my:0, down:false, wheel:0};
+  let prevDown=false;
+  function canvasPos(evt){ const r = CANVAS.getBoundingClientRect(); return {x:(evt.clientX-r.left)*DPR, y:(evt.clientY-r.top)*DPR}; }
+  CANVAS.addEventListener('mousemove', e=>{const p=canvasPos(e);input.mx=p.x;input.my=p.y;});
+  CANVAS.addEventListener('mousedown', e=>{const p=canvasPos(e);input.mx=p.x;input.my=p.y;input.down=true;});
+  CANVAS.addEventListener('mouseup', e=>{input.down=false;});
+  CANVAS.addEventListener('wheel', e=>{input.wheel += e.deltaY;});
+  CANVAS.addEventListener('touchstart', e=>{const t=e.changedTouches[0]; const r=CANVAS.getBoundingClientRect(); input.mx=(t.clientX-r.left)*DPR; input.my=(t.clientY-r.top)*DPR; input.down=true; e.preventDefault();},{passive:false});
+  CANVAS.addEventListener('touchmove', e=>{const t=e.changedTouches[0]; const r=CANVAS.getBoundingClientRect(); input.mx=(t.clientX-r.left)*DPR; input.my=(t.clientY-r.top)*DPR;},{passive:true});
+  CANVAS.addEventListener('touchend', e=>{input.down=false;},{passive:true});
+  window.addEventListener('keydown', (e)=>{
+    if(state.arcade.active){
+      if(state.arcade.mode==='gate' && (e.code==='Space' || e.key===' ')) gateStop();
+      if(e.key==='Escape'){ endArcade(); }
+      return;
+    }
+    if(e.key==='e' || e.key==='E') doExport();
+    if(e.key==='i' || e.key==='I') doImport();
+    if(e.key==='p' || e.key==='P') tryAscend();
+    if(e.key==='m' || e.key==='M') state.settings.mute = !state.settings.mute;
+    if(e.key==='-') cycleBuyQty(-1);
+    if(e.key==='=') cycleBuyQty(+1);
+    const idx='1234567890'.indexOf(e.key); if(idx!==-1) buyModule(idx);
+  });
+
+  // ===== Audio (simple) =====
+  let AC=null; function beep(f=420,d=0.05,v=0.02,type='triangle'){ if(state.settings.mute) return; try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(); const g=AC.createGain(); o.type=type; o.frequency.value=f; g.gain.value=v; o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+d); }catch{} }
+
+  // ===== Unique Theme: QUANTUM FORGE =====
+  // Hold inside the core to charge; release converts charge^2 into Bits. Research + Arcade give depth.
+
+  const MODULES = [
+    {id:0,name:'Nanite Swarm', base:20,   mult:1.15, prod:0.14},
+    {id:1,name:'Signal Printer', base:130, mult:1.15, prod:1.1},
+    {id:2,name:'Biofarm',       base:1400, mult:1.15, prod:7.5},
+    {id:3,name:'Ore Synth',     base:16000,mult:1.15, prod:44},
+    {id:4,name:'Assembler',     base:175000,mult:1.15, prod:230},
+    {id:5,name:'Credit Node',   base:1900000,mult:1.15, prod:1100},
+    {id:6,name:'Research Lab',  base:26000000,mult:1.15, prod:6200, rp:0.06}, // produces RP too
+    {id:7,name:'Flux Shrine',   base:380000000,mult:1.15, prod:35000},
+    {id:8,name:'Time Fork',     base:5500000000,mult:1.15, prod:210000},
+    {id:9,name:'Singularity',   base:82000000000,mult:1.15, prod:1300000},
+  ];
+
+  const state = {
+    bits:0, bitsTotal:0, lifetimeBits:0,
+    rp:0, rpTotal:0,
+    clickBase: 1, clickMult: 1, // click = release of pulse
+    charge: {active:false, t:0, tMax:1.6},
+    critZone: {lo:0.92, hi:1.0, mult:3},
+    combo: {v:0, max:0.5, decay:0.12},
+
+    modules: MODULES.map(m=>({id:m.id,count:0})),
+    upgrades: [],
+    tech: [],
+    achievements: [],
+    ascend: { cores:0, best:0 },
+
+    settings: { particles:true, mute:false, lowFX:false },
+    lastSave: Date.now(),
+    tab:'Forge',
+    buyQtyIndex:0,
+    scroll: {Forge:0, Shop:0, Research:0, Arcade:0, Achievements:0, Stats:0, Ascend:0, Settings:0},
+
+    // Specials
+    glitch: { next: rand(18,40), life:0, x:0,y:0, active:false, value:0 },
+    rift: { 
+      timer: rand(140,220), active:false,
+      hp:0, hpMax:0,
+      bitsReward:0, rpReward:0, prize:'bits',
+      ttl:0, open:0, closing:false, wobble:0,
+      stars:[]
+    },
+    particles: [],
+    toast: [],
+
+    // Arcade
+    arcade: { active:false, mode:null, t:0, score:0, pulses:[], gate:{x:0,v:0.9, zone:[0.45,0.55], tries:8} },
+
+    // Render helpers
+    clickArea: null,
+    ui:{drawerOpen:false, scale:1},
+  };
+
+  // Multipliers
+  const mults = { global:1, modules:1, glitch:1, combo:1 };
+  const mods  = { clickCurve:1, rpGain:1 };
+  const BUY_QTY=[1,10,100,'Max'];
+
+  // ===== Research Tree =====
+  const TECH = [
+    {id:'t_over1', name:'Overclock I',   rp:50,  pre:[],    apply:()=>{mults.global*=1.1;} , pos:[0,0], desc:'+10% global'},
+    {id:'t_curve', name:'Harmonic Clicks', rp:25, pre:[],    apply:()=>{mods.clickCurve*=1.5;}, pos:[-1,1], desc:'Pulses hit harder'},
+    {id:'t_glitch',name:'Glitch Magnet', rp:80,  pre:['t_over1'], apply:()=>{mults.glitch*=1.5;}, pos:[1,1], desc:'+50% Glitch Orbs'},
+    {id:'t_combo', name:'Flux Combo',   rp:150, pre:['t_curve'], apply:()=>{state.combo.max=0.8; state.combo.decay=0.09;}, pos:[-1,2], desc:'Higher combo cap'},
+    {id:'t_over2', name:'Overclock II',  rp:200, pre:['t_over1'], apply:()=>{mults.global*=1.2;}, pos:[0,2], desc:'+20% global'},
+    {id:'t_lab',   name:'Lab Protocols', rp:120, pre:['t_over1'], apply:()=>{mods.rpGain*=1.6;}, pos:[1,2], desc:'+60% RP gain'},
+  ];
+
+  // ===== Persistence =====
+  const SAVE_KEY='quantum_forge_v1';
+  function save(){
+    state.lastSave=Date.now();
+    const data={...state, mults, mods};
+    try{localStorage.setItem(SAVE_KEY, JSON.stringify(data));}catch{}
+  }
+  function load(){
+    try{
+      const raw=localStorage.getItem(SAVE_KEY); if(!raw) return; const d=JSON.parse(raw);
+      Object.assign(state, d); if(d.mults) Object.assign(mults,d.mults); if(d.mods) Object.assign(mods,d.mods);
+      const secs=clamp((Date.now()-(d.lastSave||Date.now()))/1000,0,3600*8);
+      const pps=totalPPS(); const off=pps*secs*0.75; if(off>0){ addBits(off); toast(`Offline +${fmt(off)} bits`);} 
+    }catch{}
+  }
+  load();
+
+  // ===== Economy =====
+  function count(id){ return state.modules[id]?.count||0; }
+  function moduleCostNext(id){ const m=MODULES[id]; return m.base * (m.mult ** count(id)); }
+  function moduleCost(id,n){ const m=MODULES[id], c=count(id); if(n===1) return m.base*(m.mult**c); const r=m.mult; const base=m.base*(r**c); return base*((r**n-1)/(r-1)); }
+  function moduleProd(id){ const m=MODULES[id]; return (m.prod||0) * mults.modules * mults.global * (1+state.ascend.cores*0.1); }
+  function totalPPS(){ let v=0; for(const m of MODULES){ v+=count(m.id)*moduleProd(m.id); } return v * (1 + state.combo.v); }
+  function rpPerSec(){ const lab=MODULES[6]; const base = (lab.rp||0) * count(6); return base * mods.rpGain; }
+
+  function clickValueFromCharge(){
+    const t=state.charge.t, tMax=state.charge.tMax; const q=t/tMax; const curve = (q*q) * mods.clickCurve;
+    return state.clickBase * state.clickMult * curve * (1+state.ascend.cores*0.1) * mults.global;
+  }
+
+  function canAfford(x){ return state.bits>=x; }
+  function buyModule(id){ const qty=BUY_QTY[state.buyQtyIndex]; let n = qty==='Max'? maxAffordable(id) : qty; if(n<=0) return; const cost=moduleCost(id,n); if(!canAfford(cost)) return; state.bits-=cost; state.modules[id].count+=n; beep(220+id*30,0.02,0.02); }
+  function maxAffordable(id){ const m=MODULES[id]; const r=m.mult; const c=count(id); const base=m.base*(r**c); if(state.bits<base) return 0; const A= state.bits*(r-1)/base + 1; const n=Math.floor(Math.log(A)/Math.log(r)); return Math.max(0,n); }
+  function cycleBuyQty(d){ state.buyQtyIndex=(state.buyQtyIndex + d + BUY_QTY.length)%BUY_QTY.length; toast(`Buy: ${BUY_QTY[state.buyQtyIndex]}`); }
+
+  function addBits(v){ if(!isFinite(v)) return; state.bits+=v; state.bitsTotal+=v; state.lifetimeBits+=v; }
+  function addRP(v){ if(!isFinite(v)) return; state.rp+=v; state.rpTotal+=v; }
+
+  // ===== Research =====
+  function hasTech(id){ return state.tech.includes(id); }
+  function techAvailable(t){ return !hasTech(t.id) && t.pre.every(p=>hasTech(p)); }
+  function buyTech(t){ if(!techAvailable(t) || state.rp < t.rp) return; state.rp -= t.rp; state.tech.push(t.id); t.apply(); toast(`Researched: ${t.name}`); beep(760,0.05,0.03); }
+
+  // ===== Ascend (Prestige) =====
+  function coreGain(){ return Math.floor(Math.sqrt(state.lifetimeBits/1e6)); }
+  function tryAscend(){ const gain=coreGain(); if(gain<=0){ toast('Generate more Bits to ascend'); return; } state.ascend.cores+=gain; state.ascend.best=Math.max(state.ascend.best,state.ascend.cores); // reset
+    state.bits=0; state.bitsTotal=0; state.clickBase=1; state.clickMult=1; state.modules=MODULES.map(m=>({id:m.id,count:0})); state.upgrades=[]; state.rp=0; state.tech=[...state.tech];
+    state.glitch={ next: rand(18,40), life:0,x:0,y:0, active:false, value:0}; toast(`Ascended: +${gain} core(s) → global x${(1+state.ascend.cores*0.1).toFixed(2)}`); beep(880,0.07,0.03); save(); }
+
+  // ===== Specials =====
+  function updateGlitch(dt){ const g=state.glitch; if(g.active){ g.life-=dt; if(g.life<=0) g.active=false; } else { g.next-=dt; if(g.next<=0){ g.active=true; g.life=10; g.x=rand(100,CANVAS.width-100); g.y=rand(120,CANVAS.height-160); g.value=(totalPPS()*rand(8,24) + clickValueFromCharge()*rand(20,60)) * mults.glitch; g.next=rand(32,68);} } }
+  function tryClickGlitch(px,py){ const g=state.glitch; if(!g.active) return false; const d2=(px-g.x)**2 + (py-g.y)**2; if(d2<=(28*DPR)**2){ addBits(g.value); g.active=false; particleBurst(g.x,g.y, 18, '#ffd54a'); toast(`Glitch +${fmt(g.value)}`); beep(1200,0.06,0.04,'sawtooth'); return true; } return false; }
+
+  // Temporal Rift — screen tear that you spam-click to seal for Bits or RP
+  function updateRift(dt){
+    const r=state.rift;
+    if(r.active){
+      r.wobble += dt;
+      if(!r.closing && r.open < 1) r.open = Math.min(1, r.open + dt*1.8);
+      if(r.closing){
+        r.open = Math.max(0, r.open - dt*1.8);
+        if(r.open<=0){ r.active=false; r.closing=false; r.timer=rand(170,240); r.stars=[]; }
+      }
+    } else {
+      r.timer -= dt;
+      if(r.timer<=0){
+        r.active = true; r.open = 0; r.closing=false; r.wobble=0;
+        const pps = Math.max(1,totalPPS());
+        r.hpMax = pps*rand(40,70);
+        r.hp = r.hpMax;
+        r.bitsReward = pps*rand(80,160);
+        r.rpReward = Math.max(5, pps*0.02*rand(20,40));
+        r.prize = Math.random()<0.5?'bits':'rp';
+        r.ttl = 30;
+        r.stars.length=0; for(let i=0;i<80;i++) r.stars.push({x:Math.random(), y:Math.random(), a:rand(0.5,1)});
+        toast('A Rift tears reality! Spam click to seal it!');
+      }
+    }
+  }
+  function riftRect(){
+    const UIS = state.ui.scale||1;
+    const pad = 16*DPR*UIS, headerH=64*DPR*UIS;
+    const compact = (CANVAS.width / DPR) < 980;
+    const sidebarW = compact ? (state.ui.drawerOpen ? Math.min(320*DPR, CANVAS.width - 2*pad) : 0) : Math.max(340*DPR, CANVAS.width*0.30);
+    const mainX=pad, mainY=pad*2+headerH; const mainW=CANVAS.width - sidebarW - pad*3; const mainH=CANVAS.height - mainY - pad;
+    const yMid = mainY + mainH*0.45;
+    const h = clamp(state.rift.open,0,1) * Math.max(60*DPR, mainH*0.25);
+    return {x:mainX+12*DPR, yMid, w:mainW-24*DPR, h};
+  }
+  function tryClickRift(px,py){
+    const r=state.rift; if(!r.active) return false; const area = riftRect();
+    if(px>=area.x && px<=area.x+area.w && Math.abs(py-area.yMid) <= area.h/2){
+      const dmg = Math.max(5, totalPPS()*0.8 + 10);
+      r.hp = Math.max(0, r.hp - dmg);
+      particleBurst(px,py,6,'#ff8fa3'); beep(980,0.02,0.02,'square');
+      if(r.hp<=0 && !r.closing){
+        r.closing = true;
+        if(r.prize==='bits'){ addBits(r.bitsReward); toast(`Rift sealed! +${fmt(r.bitsReward)} bits`); }
+        else { addRP(r.rpReward); toast(`Rift sealed! +${fmt(r.rpReward)} RP`); }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // ===== UI helpers =====
+  const clicks=[]; function addClick(x,y,w,h,onClick){ clicks.push({x,y,w,h,onClick}); } function hit(px,py,r){ return px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h; }
+  function drawButton(x,y,w,h,label,on=true,accent=false){ const r=10*DPR; CTX.save(); CTX.fillStyle= on?(accent?'#2f3947':'#1a212b'):'#11161d'; roundRect(x,y,w,h,r,true,false); CTX.fillStyle= on?'#e6eef6':'#7f8da0'; CTX.font=`700 ${14*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(label,x+w/2,y+h/2); CTX.restore(); }
+  function drawBar(x,y,w,h,t,col='#4ade80'){ CTX.fillStyle='#10151b'; roundRect(x,y,w,h,h/2,true,false); CTX.fillStyle=col; roundRect(x,y,w*clamp(t,0,1),h,h/2,true,false); }
+  function roundRect(x,y,w,h,r,fill,stroke){ CTX.beginPath(); CTX.moveTo(x+r,y); CTX.arcTo(x+w,y,x+w,y+h,r); CTX.arcTo(x+w,y+h,x,y+h,r); CTX.arcTo(x,y+h,x,y,r); CTX.arcTo(x,y,x+w,y,r); CTX.closePath(); if(fill) CTX.fill(); if(stroke) CTX.stroke(); }
+  function pill(x,y,txt){ const fs=12*DPR; const pad=6*DPR; const w=measure(txt,fs,'700')*DPR + pad*2; const h=20*DPR; CTX.fillStyle='#141a21'; roundRect(x,y,w,h,999,true,false); CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${fs}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(txt,x+w/2,y+h/2); return {w,h}; }
+  function toast(msg){ state.toast.push({msg,t:2.6}); }
+
+  // ===== Particles & Toasts =====
+  function particleBurst(x,y,n=12,color='#9be5ff'){ for(let i=0;i<n;i++){ state.particles.push({x,y, vx:rand(-120,120), vy:rand(-180,-40), life:rand(0.4,0.9), age:0, color}); } }
+  function updateParticles(dt){ for(let i=state.particles.length-1;i>=0;i--){ const p=state.particles[i]; p.age+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=220*dt; if(p.age>p.life) state.particles.splice(i,1); } }
+  function drawParticles(){ for(const p of state.particles){ const t=1-p.age/p.life; CTX.globalAlpha=Math.max(0, t); CTX.fillStyle=p.color; CTX.fillRect(p.x,p.y,3*DPR,3*DPR); CTX.globalAlpha=1; } }
+  function updateToasts(dt){ for(let i=state.toast.length-1;i>=0;i--){ const t=state.toast[i]; t.t-=dt; if(t.t<=0) state.toast.splice(i,1); } }
+  function drawToasts(){ const fs=12*DPR; CTX.font=`700 ${fs}px Inter`; CTX.textAlign='center'; let y=20*DPR; for(const t of state.toast){ CTX.fillStyle='#0f141a'; const w=measure(t.msg,fs,'700')*DPR + 26*DPR; const h=24*DPR; const x=CANVAS.width/2 - w/2; roundRect(x,y,w,h,10*DPR,true,false); CTX.fillStyle='#e6eef6'; CTX.fillText(t.msg, CANVAS.width/2, y+h/2); y+=h+8*DPR; } }
+
+  // ===== Charged Pulse (unique click) =====
+  function updateCharge(dt){
+    const area=state.clickArea; if(!area) return; const inside = ((input.mx-area.cx)**2 + (input.my-area.cy)**2) <= area.R*area.R;
+    if(input.down && !prevDown && inside){ state.charge.active=true; }
+    if(state.charge.active){
+      if(input.down){
+        state.charge.t = clamp(state.charge.t + dt*(1 + (hasTech('t_over1')?0.15:0)), 0, state.charge.tMax);
+      } else { // release
+        const base = clickValueFromCharge();
+        const q = state.charge.t/state.charge.tMax; const inCrit = q>=state.critZone.lo && q<=state.critZone.hi; const val = base * (inCrit?state.critZone.mult:1);
+        addBits(val); particleBurst(input.mx,input.my, inCrit?18:10, inCrit?'#9be5ff':'#c7d2fe'); beep(inCrit?820:520, inCrit?0.06:0.03, 0.03);
+        state.combo.v = clamp(state.combo.v + q*0.12, 0, state.combo.max);
+        addRP(q*0.4*mods.rpGain);
+        state.charge.active=false; state.charge.t=0;
+      }
+    }
+    if(!input.down){ state.charge.active=false; }
+  }
+
+  // ===== Arcade (minigames) =====
+  function startPulseRush(){
+    state.arcade.active = true;
+    state.arcade.mode = 'pulse';
+    state.arcade.t = 25;
+    state.arcade.score = 0;
+    state.arcade.pulses = [];
+    state.arcade.pulse = { spawn: 1.0, life: 2.0, rMin: 18, rMax: 34, maxOnScreen: 10 };
+    toast('Pulse Rush: click the orbs!');
+  }
+  function startGate(){
+    state.arcade.active = true;
+    state.arcade.mode = 'gate';
+    state.arcade.t = 30;
+    state.arcade.score = 0;
+    state.arcade.gate = { x: 0.0, v: 0.9, zone: [0.45, 0.55], tries: 8 };
+    toast('Timing Gate: press Space or click the bar');
+  }
+  function endArcade(){
+    if(!state.arcade.active) return;
+    const s = state.arcade.score; const mode = state.arcade.mode;
+    state.arcade.active=false;
+    let bits=0, rp=0;
+    if(mode==='pulse'){ bits = s*3; rp = s*0.3; }
+    else if(mode==='gate'){ bits = s*8; rp = s*0.6; }
+    if(bits||rp){ addBits(bits); addRP(rp); toast(`Arcade reward: +${fmt(bits)} bits, +${fmt(rp)} RP`); }
+  }
+  function updateArcade(dt){
+    if(!state.arcade.active) return;
+    const A=state.arcade; A.t-=dt; if(A.t<=0){ endArcade(); return; }
+    if(A.mode==='pulse'){
+      const conf=A.pulse; if(A.pulses.length < conf.maxOnScreen && Math.random()<dt*conf.spawn){
+        const life=conf.life; A.pulses.push({x:rand(120,CANVAS.width-120), y:rand(160,CANVAS.height-160), life, max:life});
+      }
+      for(let i=A.pulses.length-1;i>=0;i--){ const p=A.pulses[i]; p.life-=dt; if(p.life<=0) A.pulses.splice(i,1); }
+    } else if(A.mode==='gate'){
+      const g=A.gate; g.x += g.v*dt; if(g.x<0){ g.x=0; g.v=Math.abs(g.v);} if(g.x>1){ g.x=1; g.v=-Math.abs(g.v);} 
+    }
+  }
+  function drawArcade(){
+    if(!state.arcade.active) return;
+    const A=state.arcade;
+    CTX.globalAlpha=0.85; CTX.fillStyle='#000'; CTX.fillRect(0,0,CANVAS.width,CANVAS.height); CTX.globalAlpha=1;
+    CTX.fillStyle='#e6eef6'; CTX.font=`800 ${18*DPR}px Inter`; CTX.textAlign='center'; CTX.fillText(`${A.mode==='pulse'?'Pulse Rush':'Timing Gate'} — ${A.t.toFixed(1)}s`, CANVAS.width/2, 60*DPR);
+    if(A.mode==='pulse'){
+      const conf=A.pulse; for(const p of A.pulses){ const t=p.life/p.max; const r=lerp(conf.rMin*DPR, conf.rMax*DPR, t); CTX.globalAlpha=Math.max(0.2, t); CTX.fillStyle='#8be9fd'; CTX.beginPath(); CTX.arc(p.x,p.y,r,0,Math.PI*2); CTX.fill(); CTX.globalAlpha=1; }
+      CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${14*DPR}px Inter`; CTX.fillText(`Score: ${A.score}`, CANVAS.width/2, 90*DPR);
+    } else if(A.mode==='gate'){
+      const cx=CANVAS.width/2, y=CANVAS.height/2, W=520*DPR, H=22*DPR; CTX.fillStyle='#121821'; roundRect(cx-W/2,y-H/2,W,H,10*DPR,true,false);
+      const [zl,zh]=A.gate.zone; CTX.fillStyle='#284b63'; roundRect(cx-W/2+W*zl, y-H/2, W*(zh-zl), H, 10*DPR, true,false);
+      const mx = cx-W/2+W*A.gate.x; CTX.fillStyle='#e6eef6'; roundRect(mx-5*DPR, y-10*DPR, 10*DPR, 20*DPR, 3*DPR, true,false);
+      CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${14*DPR}px Inter`; CTX.fillText(`Tries: ${A.gate.tries}  Score: ${A.score}`, cx, y+40*DPR);
+      CTX.fillText(`Press Space OR Click the bar`, cx, y+62*DPR);
+    }
+  }
+  function handleArcadeClick(x,y){
+    if(!state.arcade.active) return false; const A=state.arcade;
+    if(A.mode==='pulse'){
+      const conf=A.pulse; for(let i=A.pulses.length-1;i>=0;i--){ const p=A.pulses[i]; const t=p.life/p.max; const r=lerp(conf.rMin*DPR, conf.rMax*DPR, t); const d2=(x-p.x)**2+(y-p.y)**2; if(d2<=r*r){ A.pulses.splice(i,1); A.score++; addBits(2); addRP(0.2*mods.rpGain); beep(900,0.03,0.02,'square'); return true; } } return true;
+    }
+    if(A.mode==='gate'){
+      const cx=CANVAS.width/2, yMid=CANVAS.height/2, W=520*DPR, H=22*DPR; const rx=cx-W/2, ry=yMid-H/2; if(x>=rx && x<=rx+W && y>=ry && y<=ry+H){ gateStop(); return true; } return true;
+    }
+    return true;
+  }
+  function gateStop(){
+    const A=state.arcade; if(!A.active||A.mode!=='gate'||A.gate.tries<=0) return; const g=A.gate; A.gate.tries--; const inside=(g.x>=g.zone[0]&&g.x<=g.zone[1]);
+    if(inside){ A.score++; const mid=(g.zone[0]+g.zone[1])/2; if(Math.abs(g.x-mid) <= (g.zone[1]-g.zone[0])*0.15){ A.score++; toast('Perfect! +Bonus'); } addRP(1.2*mods.rpGain); addBits(8); beep(880,0.05,0.02,'sine'); }
+    else { beep(260,0.05,0.02,'sine'); }
+    if(A.gate.tries<=0) endArcade();
+  }
+
+  // ===== Update & Draw =====
+  function update(dt){
+    // passive income
+    const pps = totalPPS(); addBits(pps*dt); addRP(rpPerSec()*dt);
+    // combo decay
+    state.combo.v = clamp(state.combo.v - state.combo.decay*dt, 0, state.combo.max);
+    // systems
+    updateGlitch(dt);
+    updateRift(dt);
+    updateArcade(dt);
+    updateCharge(dt);
+    updateParticles(dt);
+    updateToasts(dt);
+  }
+
+  function draw(dt){
+    clicks.length=0; CTX.clearRect(0,0,CANVAS.width,CANVAS.height);
+    // BG
+    const g=CTX.createLinearGradient(0,0,0,CANVAS.height); g.addColorStop(0,'#0a0e13'); g.addColorStop(1,'#0a0e13'); CTX.fillStyle=g; CTX.fillRect(0,0,CANVAS.width,CANVAS.height);
+
+    // Layout metrics
+    const UIS = clamp(Math.min(CANVAS.width/(1280*DPR), CANVAS.height/(720*DPR)), 0.8, 1.15);
+    state.ui.scale = UIS;
+    const pad=16*DPR*UIS, headerH=64*DPR*UIS; const compact = (CANVAS.width / DPR) < 980;
+    let sidebarW = compact ? (state.ui.drawerOpen ? Math.min(320*DPR, CANVAS.width - 2*pad) : 0) : Math.max(340*DPR, CANVAS.width*0.30);
+
+    // Header
+    CTX.fillStyle='#0f1318'; roundRect(pad,pad,CANVAS.width-pad*2,headerH,14*DPR,true,false);
+    CTX.fillStyle='#e6eef6'; CTX.font=`800 ${20*DPR*state.ui.scale}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText('Quantum Forge', pad*2, pad+headerH/2);
+    let xr = CANVAS.width - pad*2 - 100*DPR; pill(xr, pad+headerH/2-10*DPR, `Buy: ${BUY_QTY[state.buyQtyIndex]}`); xr-=150*DPR; pill(xr, pad+headerH/2-10*DPR, `Cores: ${fmt(state.ascend.cores)} (x${(1+state.ascend.cores*0.1).toFixed(2)})`);
+    if(compact){
+      const bw=36*DPR, bh=32*DPR; const bx=CANVAS.width - pad - bw, by=pad + headerH/2 - bh/2;
+      drawButton(bx,by,bw,bh, state.ui.drawerOpen?'✕':'≡', true, true);
+      addClick(bx,by,bw,bh, ()=>{ state.ui.drawerOpen=!state.ui.drawerOpen; });
+    }
+
+    // Layout rects
+    const mainX=pad, mainY=pad*2+headerH; const mainW=CANVAS.width - sidebarW - pad*3; const mainH=CANVAS.height - mainY - pad; const sideX=CANVAS.width - sidebarW - pad; const sideY=mainY; const sideH=mainH;
+
+    // Main panel
+    CTX.fillStyle='#0f141a'; roundRect(mainX,mainY,mainW,mainH,16*DPR,true,false);
+
+    // HUD inside main panel (always visible)
+    (function(){
+      const padHUD = 10*DPR*UIS;
+      const f1 = (16*UIS)*DPR;
+      const f2 = (12*UIS)*DPR;
+      const l1 = `Bits: ${fmt(state.bits)}`;
+      const l2 = `PPS: ${fmt(totalPPS())}   RP: ${fmt(state.rp)}`;
+      CTX.font = `800 ${f1}px Inter`;
+      const w1 = CTX.measureText(l1).width;
+      CTX.font = `700 ${f2}px Inter`;
+      const w2 = CTX.measureText(l2).width;
+      const w = Math.max(w1,w2) + padHUD*2;
+      const h = f1 + f2 + padHUD*3;
+      const bx = mainX + (mainW - w)/2;
+      const by = mainY + 8*DPR;
+      CTX.fillStyle = '#0b1117';
+      roundRect(bx,by,w,h,10*DPR,true,false);
+      CTX.fillStyle='#e6eef6';
+      CTX.font = `800 ${f1}px Inter`;
+      CTX.textAlign='center';
+      CTX.textBaseline='top';
+      CTX.fillText(l1, bx + w/2, by + padHUD*0.8);
+      CTX.fillStyle='#b6c6da';
+      CTX.font = `700 ${f2}px Inter`;
+      CTX.fillText(l2, bx + w/2, by + padHUD*0.8 + f1 + 6*DPR);
+    })();
+
+    // Charged core
+    const cx = mainX + mainW*0.5, cy = mainY + mainH*(compact?0.60:0.58); const R = Math.min(mainW,mainH)*(compact?0.28:0.32);
+    state.clickArea={cx,cy,R};
+    // aura
+    CTX.save(); CTX.shadowBlur=36*DPR; CTX.shadowColor='#213141'; CTX.fillStyle='#16202b'; CTX.beginPath(); CTX.arc(cx,cy,R,0,Math.PI*2); CTX.fill(); CTX.restore();
+    // ring progress
+    const q = state.charge.t/state.charge.tMax; CTX.lineWidth=8*DPR; CTX.strokeStyle='#2d4156'; CTX.beginPath(); CTX.arc(cx,cy,R-14*DPR, -Math.PI/2, -Math.PI/2 + Math.PI*2*q); CTX.stroke();
+    // crit arc
+    const a1 = -Math.PI/2 + Math.PI*2*state.critZone.lo; const a2 = -Math.PI/2 + Math.PI*2*state.critZone.hi; CTX.strokeStyle='#86e7ff'; CTX.lineWidth=6*DPR; CTX.beginPath(); CTX.arc(cx,cy,R-18*DPR,a1,a2); CTX.stroke();
+    // text
+    CTX.fillStyle='#e6eef6'; CTX.font=`800 ${22*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(state.charge.active?'RELEASE':'HOLD', cx, cy);
+
+    // Glitch orb
+    if(state.glitch.active){ const t=(Math.sin(performance.now()/180)+1)/2; CTX.save(); CTX.translate(state.glitch.x,state.glitch.y); CTX.rotate(t*0.3); CTX.fillStyle='#ffd54a'; CTX.beginPath(); CTX.arc(0,0,16*DPR,0,Math.PI*2); CTX.fill(); CTX.fillStyle='#7a5600'; CTX.beginPath(); CTX.arc(-5*DPR,-2*DPR,2.5*DPR,0,Math.PI*2); CTX.fill(); CTX.restore(); addClick(state.glitch.x-18*DPR, state.glitch.y-18*DPR, 36*DPR,36*DPR, (px,py)=>{tryClickGlitch(px,py);}); }
+
+    // Rift overlay
+    if(state.rift.active){
+      const r=state.rift; const rect = riftRect(); const x=rect.x, w=rect.w; const yMid=rect.yMid; const h=rect.h; 
+      CTX.save();
+      CTX.globalAlpha=0.5*r.open; CTX.fillStyle='#000'; CTX.fillRect(0,0,CANVAS.width,CANVAS.height); CTX.globalAlpha=1;
+      CTX.beginPath();
+      const segs=16; const amp=8*DPR*r.open; let xx, yy;
+      CTX.moveTo(x, yMid - h/2);
+      for(let i=1;i<=segs;i++){ const t=i/segs; xx = x + w*t; yy = yMid - h/2 + Math.sin((t*10 + r.wobble*2))*amp; CTX.lineTo(xx,yy);} 
+      for(let i=segs;i>=0;i--){ const t=i/segs; xx = x + w*t; yy = yMid + h/2 + Math.sin((t*10 + r.wobble*2 + Math.PI))*amp; CTX.lineTo(xx,yy);} 
+      CTX.closePath();
+      CTX.fillStyle='#0a0b12'; CTX.fill();
+      for(const s of r.stars){ const sx = x + s.x*w; const sy = yMid - h/2 + s.y*h; CTX.globalAlpha=s.a; CTX.fillStyle='#8dd3ff'; CTX.fillRect(sx,sy,2*DPR,2*DPR);} CTX.globalAlpha=1;
+      CTX.strokeStyle='#1f2a3a'; CTX.lineWidth=2*DPR; CTX.stroke();
+      CTX.fillStyle='#e6eef6'; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='center'; CTX.fillText('RIFT! SPAM-CLICK!', x+w/2, yMid - h/2 - 28*DPR);
+      const barW = Math.min(w*0.7, 520*DPR), barH = 16*DPR, bx = x + (w - barW)/2, by = yMid + h/2 + 12*DPR;
+      drawBar(bx, by, barW, barH, 1 - r.hp/r.hpMax, '#ef4444');
+      CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${12*DPR}px Inter`;
+      const prizeTxt = r.prize==='bits'?`Reward: ${fmt(r.bitsReward)} bits`:`Reward: ${fmt(r.rpReward)} RP`;
+      CTX.fillText(prizeTxt, x+w/2, by + barH + 16*DPR);
+      CTX.restore();
+    }
+
+    // Sidebar
+    if(sidebarW>0){
+      CTX.fillStyle='#0f141a'; roundRect(sideX,sideY,sidebarW,sideH,16*DPR,true,false);
+      const tabs=['Forge','Shop','Research','Arcade','Achievements','Stats','Ascend','Settings'];
+      const tabH=40*DPR; let tx=sideX; const tw=sidebarW/tabs.length; const tabFs = tw < 90*DPR ? 11*DPR : 13*DPR; 
+      for(const tname of tabs){ const active=state.tab===tname; CTX.fillStyle=active?'#1a222b':'#0f141a'; roundRect(tx,sideY,tw,tabH,10*DPR,true,false); CTX.fillStyle=active?'#e2ebf5':'#9fb0c6'; CTX.font=`700 ${tabFs}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(tname, tx+tw/2, sideY+tabH/2); addClick(tx,sideY,tw,tabH,()=>{state.tab=tname;}); tx+=tw; }
+
+      const listX=sideX+10*DPR, listY=sideY+tabH+10*DPR, listW=sidebarW-20*DPR, listH=sideH-tabH-20*DPR; CTX.save(); CTX.beginPath(); CTX.rect(listX,listY,listW,listH); CTX.clip();
+      const sOff=state.scroll[state.tab]||0; let y=listY - sOff;
+
+      if(state.tab==='Forge'){
+        const rowH=70*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false); CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.fillText(`Combo: ${(state.combo.v*100).toFixed(0)}% (decay ${Math.round(state.combo.decay*100)}%/s)`, listX+12*DPR, y+12*DPR); CTX.fillText(`PPS (after combo): ${fmt(totalPPS())} | RP/s: ${fmt(rpPerSec())}`, listX+12*DPR, y+32*DPR);
+        y+=rowH+10*DPR;
+        const rowH2=80*DPR; CTX.fillStyle='#0f141a'; roundRect(listX,y,listW,rowH2,10*DPR,true,false); CTX.fillStyle='#b6c6da'; CTX.font=`600 ${12*DPR}px Inter`; CTX.fillText('Hold inside the core to charge. Release in the highlighted arc for critical payout. Play Arcade for bursts & RP.', listX+12*DPR, y+14*DPR);
+        y+=rowH2+10*DPR;
+      }
+
+      if(state.tab==='Shop'){
+        const us = state.ui.scale||1;
+        const isNarrow = listW < 460*DPR*us;
+        const baseRowH = (isNarrow ? 88 : 66)*DPR*us;
+        for(const m of MODULES){
+          const n=count(m.id);
+          const qty=BUY_QTY[state.buyQtyIndex];
+          const nToBuy = qty==='Max'?maxAffordable(m.id):qty;
+          const cost=moduleCost(m.id,nToBuy);
+          const afford=nToBuy>0 && state.bits>=cost;
+          const rowH=baseRowH;
+          CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR*us,true,false);
+
+          const nameX=listX+12*DPR*us, nameY=y+10*DPR*us;
+          CTX.fillStyle='#e6eef6'; CTX.font=`800 ${15*DPR*us}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top';
+          CTX.fillText(m.name, nameX, nameY);
+
+          const label = qty==='Max'?`Buy ${nToBuy}`:`Buy x${nToBuy}`;
+          const fsBtn = 14*DPR*us; CTX.font=`700 ${fsBtn}px Inter`;
+          const bw = Math.max(90*DPR*us, CTX.measureText(label).width + 24*DPR*us);
+          const bh = 30*DPR*us;
+          const bx=listX+listW-bw-12*DPR*us, by=y+rowH-bh-10*DPR*us;
+
+          if(isNarrow){
+            CTX.fillStyle=afford?'#b8f0c2':'#93a6bf'; CTX.font=`800 ${13*DPR*us}px Inter`; CTX.textAlign='left';
+            CTX.fillText(`Cost: ${fmt(cost)}`, nameX, nameY + 18*DPR*us);
+            CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR*us}px Inter`;
+            CTX.fillText(`Owned: ${n} • +${fmt(moduleProd(m.id))}/s each${m.rp?` • RP: ${m.rp}/s each`:''}`, nameX, nameY + 36*DPR*us);
+          } else {
+            CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR*us}px Inter`; CTX.textAlign='left';
+            CTX.fillText(`Owned: ${n} • +${fmt(moduleProd(m.id))}/s each${m.rp?` • RP: ${m.rp}/s each`:''}`, nameX, nameY + 22*DPR*us);
+            CTX.fillStyle=afford?'#b8f0c2':'#93a6bf'; CTX.font=`800 ${14*DPR*us}px Inter`; CTX.textAlign='right';
+            CTX.fillText(`Cost: ${fmt(cost)}`, bx - 12*DPR*us, nameY + 2*DPR*us);
           }
-        </style>
-        <h1>🚫 ACCESS DENIED</h1>
-        <p>This page is currently unavailable.</p>
-      `;
-    } else if (data.message) {
-      const banner = document.createElement("div");
-      banner.style.cssText = "background: #ff4444; color: white; font-family: 'Press Start 2P'; padding: 1em; position: fixed; top: 0; left: 0; right: 0; z-index: 999;";
-      banner.textContent = data.message;
-      document.body.prepend(banner);
-    }
-  });
 
-setInterval(async () => {
-  try {
-    const res = await fetch("https://some-api-compat-thing.onrender.com/api/client-poll");
-    const data = await res.json();
-    if (data.refresh) location.reload();
-  } catch (err) {
-    console.error("Poll failed:", err);
-  }
-}, 3000);
+          drawButton(bx,by,bw,bh, label, afford,true);
+          addClick(bx,by,bw,bh,()=>buyModule(m.id));
+          y+=rowH+10*DPR*us;
+        }
+      }
 
-// 🍪 Original Cookie Clicker Code
-const resetBtn = document.getElementById('reset-btn');
-const cookieBtn = document.getElementById('cookie-btn');
-const storePanel = document.getElementById('store-panel');
-const statsPanel = document.getElementById('stats-panel');
-const countDisplay = document.getElementById('cookie-count');
-const cursorOrbit = document.getElementById('cursor-orbit');
-const cheatMenu = document.getElementById('cheat-menu');
-const cheatInput = document.getElementById('cheat-input');
-const autoClickToggle = document.getElementById('auto-click-toggle');
-const infiniteCpsToggle = document.getElementById('infinite-cps-toggle');
-const cheatSetBtn = document.getElementById('cheat-set-btn');
-const cheatCloseBtn = document.getElementById('cheat-close-btn');
-const icons = {
-  'Cursor':'☝️','Grandma':'👵','Farm':'🌾','Mine':'⛏️','Factory':'🏭','Bank':'🏦','Temple':'⛩️','Wizard Tower':'🏰',
-  'Shipment':'🚢','Alchemy Lab':'⚗️','Portal':'🌀','Time Machine':'⏰','Antimatter Condenser':'⚛️','Prism':'🔮',
-  'Chancemaker':'🎲','Fractal Engine':'📐','Javascript Console':'🖥️','Idleverse':'🌌','Cortex Baker':'🧠','You':'👤'
-};
-let cookies = parseInt(localStorage.getItem('cookies')) || 0;
-let autoClickInterval = null;
-let infiniteCPS = false;
-const defaultItems = [ /* trimmed for brevity – keep your full array here */ ];
-let items;
-try {
-  const saved = JSON.parse(localStorage.getItem('items'));
-  items = Array.isArray(saved) && saved.length === defaultItems.length ? saved : defaultItems;
-} catch {
-  items = defaultItems;
-}
-function saveState() {
-  localStorage.setItem('cookies', cookies);
-  localStorage.setItem('items', JSON.stringify(items));
-}
-function formatNumber(v) {
-  if (v === Infinity) return '∞';
-  const suf = ['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No'];
-  let i = 0, n = v;
-  while (Math.abs(n) >= 1000 && i < suf.length - 1) { n /= 1000; i++; }
-  return `${parseFloat(n.toFixed(2))}${suf[i]}`;
-}
-function calculateCPS() {
-  return items.reduce((a,i)=>a + i.count * i.cps, 0);
-}
-function renderStore() {
-  storePanel.innerHTML = '<h3>Store</h3>';
-  items.forEach((it, idx) => {
-    const cost = Math.floor(it.baseCost * Math.pow(1.15, it.count));
-    const btn = `<button ${(!infiniteCPS && cookies >= cost) ? '' : 'disabled'} onclick="buyItem(${idx})">${formatNumber(cost)} 🍪</button>`;
-    const d = document.createElement('div');
-    d.className = 'store-item';
-    d.innerHTML = `<span>${it.name} (${formatNumber(it.count)})</span>${btn}`;
-    storePanel.appendChild(d);
-  });
-}
-function renderStats() {
-  statsPanel.innerHTML = '<h3>Stats</h3>';
-  items.filter(it=>it.name!=='Cursor').forEach(it => {
-    const d = document.createElement('div');
-    d.className='stats-item';
-    for (let j=0;j<it.count;j++){
-      const s=document.createElement('span');
-      s.className='icon';
-      s.textContent=icons[it.name]||'❔';
-      d.appendChild(s);
+      if(state.tab==='Research'){
+        const cxTree = listX + listW/2; const unit=120*DPR;
+        for(const t of TECH){ for(const p of t.pre){ const tp=TECH.find(x=>x.id===p); const x1=cxTree + (tp.pos[0]*unit), y1 = y + 30*DPR + tp.pos[1]*unit; const x2=cxTree + (t.pos[0]*unit),  y2 = y + 30*DPR + t.pos[1]*unit; CTX.strokeStyle='#24303c'; CTX.lineWidth=2*DPR; CTX.beginPath(); CTX.moveTo(x1,y1); CTX.lineTo(x2,y2); CTX.stroke(); }}
+        for(const t of TECH){ const nx=cxTree + (t.pos[0]*unit), ny = y + 30*DPR + t.pos[1]*unit; const owned=hasTech(t.id); const avail = techAvailable(t) && state.rp>=t.rp; CTX.fillStyle= owned?'#1f3427': (avail?'#1f2631':'#11161d'); CTX.beginPath(); CTX.arc(nx,ny,22*DPR,0,Math.PI*2); CTX.fill(); CTX.strokeStyle= avail?'#7fd1ff':'#2a3949'; CTX.lineWidth=2*DPR; CTX.stroke(); CTX.fillStyle= owned?'#c8f7da':'#e6eef6'; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(t.name, nx, ny-34*DPR); CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${11*DPR}px Inter`; CTX.fillText(`${t.desc} • ${t.rp} RP`, nx, ny+34*DPR); addClick(nx-24*DPR, ny-24*DPR, 48*DPR,48*DPR, ()=>buyTech(t)); }
+        y += 30*DPR + 3*unit + 40*DPR;
+      }
+
+      if(state.tab==='Arcade'){
+        const us = state.ui.scale||1;
+        const isNarrow = listW < 500*DPR*us;
+        function arcadeRow(title, desc, onClick){
+          const fsBtn = 14*DPR*us; CTX.font=`700 ${fsBtn}px Inter`;
+          const btnTextW = CTX.measureText(title).width;
+          const bw = Math.max(140*DPR*us, Math.min(220*DPR*us, btnTextW + 28*DPR*us));
+          const bh = 36*DPR*us;
+          const rowH = (isNarrow? (bh + 32*DPR*us + 22*DPR*us) : 56*DPR*us);
+          CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR*us,true,false);
+          const bx=listX+12*DPR*us, by=y+10*DPR*us;
+          drawButton(bx,by,bw,bh, title, true,true);
+          addClick(bx,by,bw,bh,onClick);
+          CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR*us}px Inter`; CTX.textAlign='left';
+          if(isNarrow){
+            CTX.fillText(desc, bx, by + bh + 16*DPR*us);
+          } else {
+            const dx = bx + bw + 14*DPR*us; const dy = y + rowH/2 + 4*DPR*us;
+            CTX.textBaseline='middle';
+            CTX.fillText(desc, dx, dy);
+          }
+          y+=rowH+10*DPR*us;
+        }
+        arcadeRow('Start Pulse Rush','Rapid orbs spawn. Click them for Bits and RP.', ()=>startPulseRush());
+        arcadeRow('Start Timing Gate','Stop the marker in the zone with Space. Win tries for RP.', ()=>startGate());
+      }
+
+      if(state.tab==='Achievements'){
+        const rows=[ ['First Pulse','Release a charged pulse once', state.lifetimeBits>0], ['Collector','Own 20 modules total', state.modules.reduce((a,b)=>a+(b.count||0),0)>=20], ['Researcher','Spend 50 RP', state.rpTotal>=50], ['Arcader','Finish a minigame', state.arcadeLastRewarded] ];
+        for(const r of rows){ const rowH=48*DPR; CTX.fillStyle=r[2]?'#14211a':'#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false); CTX.fillStyle=r[2]?'#e2f6e9':'#e8f0f8'; CTX.font=`800 ${14*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(r[0], listX+12*DPR, y+rowH/2-10*DPR); CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR}px Inter`; CTX.fillText(r[1], listX+12*DPR, y+rowH/2+10*DPR); y+=rowH+8*DPR; }
+      }
+
+      if(state.tab==='Stats'){
+        const stats=[ ['Bits',fmt(state.bits)], ['Lifetime Bits',fmt(state.lifetimeBits)], ['PPS (base)',fmt(totalPPS()/(1+state.combo.v))], ['PPS (with combo)',fmt(totalPPS())], ['RP',fmt(state.rp)], ['RP/s',fmt(rpPerSec())], ['Modules', state.modules.reduce((a,b)=>a+(b.count||0),0).toString()], ['Cores', fmt(state.ascend.cores)] ];
+        for(const [k,v] of stats){ const rowH=40*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,8*DPR,true,false); CTX.fillStyle='#a9b9cf'; CTX.font=`600 ${12*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(k, listX+12*DPR, y+rowH/2); CTX.textAlign='right'; CTX.fillStyle='#e8f0f8'; CTX.font=`800 ${13*DPR}px Inter`; CTX.fillText(v, listX+listW-12*DPR, y+rowH/2); y+=rowH+8*DPR; }
+      }
+
+      if(state.tab==='Ascend'){
+        const gain=coreGain(); const rowH=120*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false); CTX.fillStyle='#e8f0f8'; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.fillText('Ascend resets progress for permanent Cores', listX+12*DPR, y+10*DPR); CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${13*DPR}px Inter`; CTX.fillText(`You would gain: ${gain} cores (global x${(1+(state.ascend.cores+gain)*0.1).toFixed(2)})`, listX+12*DPR, y+32*DPR); const bw=160*DPR,bh=36*DPR; const bx=listX+listW-bw-12*DPR, by=y+rowH-bh-12*DPR; drawButton(bx,by,bw,bh,'Ascend (P)', gain>0,true); addClick(bx,by,bw,bh,()=>tryAscend()); }
+
+      if(state.tab==='Settings'){
+        const items=[ ['Particles','particles'], ['Low FX','lowFX'], ['Mute (M)','mute'], ['Export (E)','export'], ['Import (I)','import'] ];
+        for(const it of items){ const rowH=44*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,8*DPR,true,false); CTX.fillStyle='#e8f0f8'; CTX.font=`700 ${13*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(it[0], listX+12*DPR, y+rowH/2); const bw=110*DPR,bh=30*DPR; const bx=listX+listW-bw-12*DPR, by=y+rowH/2-bh/2; if(it[1]==='export'){ drawButton(bx,by,bw,bh,'Export',true,true); addClick(bx,by,bw,bh,()=>doExport()); } else if(it[1]==='import'){ drawButton(bx,by,bw,bh,'Import',true,true); addClick(bx,by,bw,bh,()=>doImport()); } else { const key=it[1]; const val=state.settings[key]; drawButton(bx,by,bw,bh,val?'ON':'OFF',true,val); addClick(bx,by,bw,bh,()=>{state.settings[key]=!state.settings[key];}); } y+=rowH+8*DPR; }
+        const rowH=60*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,8*DPR,true,false); CTX.fillStyle='#e8f0f8'; CTX.font=`700 ${13*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.fillText('Buy Quantity ([-] / [=])', listX+12*DPR, y+10*DPR); const wBtn=70*DPR; let bx=listX+12*DPR; const by=y+rowH-38*DPR; BUY_QTY.forEach((q,i)=>{ const on=i===state.buyQtyIndex; drawButton(bx,by,wBtn,28*DPR,q.toString(),true,on); addClick(bx,by,wBtn,28*DPR,()=>{state.buyQtyIndex=i;}); bx+=wBtn+8*DPR; });
+      }
+
+      CTX.restore();
+      // Sidebar scroll
+      if(Math.abs(input.wheel)>0.1){ state.scroll[state.tab]=clamp((state.scroll[state.tab]||0)+ input.wheel*0.5, 0, Math.max(0, y-(listY+listH))); input.wheel=0; }
     }
-    statsPanel.appendChild(d);
-  });
-}
-function renderOrbit() {
-  cursorOrbit.innerHTML = '';
-  const ci = items.find(it=>it.name==='Cursor') || {count:0};
-  const count = ci.count;
-  const r = 80;
-  const step = 360/(count||1);
-  for (let k=0; k<count; k++) {
-    const angle = k*step;
-    const icon = document.createElement('span');
-    icon.className='orbit-icon';
-    icon.style.left='50%';
-    icon.style.top='50%';
-    icon.style.transform = `translate(-50%,-50%) rotate(${angle}deg) translateX(${r}px) rotate(180deg)`;
-    icon.textContent = icons['Cursor'];
-    cursorOrbit.appendChild(icon);
+
+    // Particles + Toasts on top
+    drawParticles();
+    drawToasts();
+
+    // Arcade overlay last
+    drawArcade();
   }
-}
-function updateUI() {
-  cookies = Math.max(0, cookies);
-  const cpsVal = calculateCPS();
-  countDisplay.innerHTML = `${formatNumber(cookies)} cookies<br><small>per second: <span id='cps'>${formatNumber(cpsVal)}</span></small>`;
-  renderStore(); renderStats(); renderOrbit(); saveState();
-}
-function buyItem(idx) {
-  if (infiniteCPS) return;
-  const it = items[idx];
-  const cost = Math.floor(it.baseCost * Math.pow(1.15, it.count));
-  if (cookies >= cost) { cookies -= cost; it.count++; updateUI(); }
-}
-resetBtn.addEventListener('click',()=>{
-  if (confirm('Delete save?')){
-    localStorage.removeItem('cookies');
-    localStorage.removeItem('items');
-    cookies=0;
-    items.splice(0, items.length, ...defaultItems.map(i=>({...i})));
-    infiniteCPS=false;
-    if(autoClickInterval){clearInterval(autoClickInterval);autoClickInterval=null;}
-    updateUI();
+
+  // ===== Click dispatch =====
+  function dispatchClick(px,py){
+    // Rift has priority
+    if(state.rift.active && tryClickRift(px,py)) return;
+    // UI
+    for(let i=clicks.length-1;i>=0;i--){ const c=clicks[i]; if(hit(px,py,c)){ c.onClick(px,py); return; } }
+    // Arcade overlay
+    if(state.arcade.active){ handleArcadeClick(px,py); return; }
+    // Specials
+    if(tryClickGlitch(px,py)) return;
   }
-});
-cookieBtn.addEventListener('click',()=>{cookies++; updateUI();});
-header.addEventListener('dblclick', e=>{ if(e.ctrlKey) cheatMenu.style.display='block'; });
-cheatCloseBtn.addEventListener('click',()=>{ cheatMenu.style.display='none'; });
-cheatSetBtn.addEventListener('click',()=>{
-  cookies += parseInt(cheatInput.value)||0;
-  if(autoClickToggle.checked && !autoClickInterval) autoClickInterval = setInterval(()=>{cookies++;updateUI()},100);
-  if(!autoClickToggle.checked && autoClickInterval){clearInterval(autoClickInterval);autoClickInterval=null;}
-  infiniteCPS = infiniteCpsToggle.checked;
-  updateUI();
-  cheatMenu.style.display='none';
-});
-setInterval(()=>{ cookies += calculateCPS(); updateUI(); }, 1000);
-updateUI();
-  </script>
+  CANVAS.addEventListener('click', (e)=>{ const r=canvasPos(e); dispatchClick(r.x,r.y); });
+
+  // ===== Export / Import =====
+  function doExport(){ const data=localStorage.getItem(SAVE_KEY)||JSON.stringify({...state,mults,mods}); if(navigator.clipboard){ navigator.clipboard.writeText(data).then(()=>toast('Save copied')).catch(()=>alert(data)); } else alert(data); }
+  function doImport(){ const data=prompt('Paste your save data:'); if(!data) return; try{ localStorage.setItem(SAVE_KEY,data); toast('Imported. Reloading…'); setTimeout(()=>location.reload(), 400);}catch{ toast('Import failed'); }}
+
+  // ===== Autosave =====
+  let saveAcc=0; function autoSave(dt){ saveAcc+=dt; if(saveAcc>10){ saveAcc=0; save(); } }
+
+  // ===== Main loop =====
+  let last=nowMs(); function loop(){ resize(); const t=nowMs(); let dt=(t-last)/1000; last=t; dt=clamp(dt,0,0.1); if(state.settings.lowFX) dt*=0.9; update(dt); draw(dt); autoSave(dt); prevDown=input.down; requestAnimationFrame(loop); } loop();
+})();
+</script>
 </body>
 </html>
