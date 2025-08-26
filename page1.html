@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Quantum Forge</title>
+<title>Quantum Forge — Linear + Cheats</title>
 <style>
   :root{ color-scheme: dark; }
   html,body{height:100%;margin:0;background:#090c10;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
@@ -44,14 +44,6 @@
 
   function onPointerMove(e){
     const p=canvasPos(e); input.mx=p.x; input.my=p.y;
-    if(state.ui.researchOverlay && state.ui.researchOverlay.open && state.ui.researchOverlay.pan.active){
-      const pan=state.ui.researchOverlay.pan;
-      const dx=input.mx-pan.lastX, dy=input.my-pan.lastY;
-      const eps2=(CLICK_EPS*DPR)**2;
-      if(dx*dx+dy*dy>eps2){ state.ui.researchOverlay.camX+=dx; state.ui.researchOverlay.camY+=dy; pan.moved=true; }
-      pan.lastX=input.mx; pan.lastY=input.my;
-      return;
-    }
     const dr=state.ui.scrollDrag;
     if(dr.active&&dr.tab===state.tab){
       const dy=input.my-dr.lastY; const max=state.ui.maxScroll||0;
@@ -61,10 +53,6 @@
   }
   function onPointerDown(e){
     const p=canvasPos(e); input.mx=p.x; input.my=p.y; input.down=true;
-    if(state.ui.researchOverlay && state.ui.researchOverlay.open){
-      state.ui.researchOverlay.pan={active:true,lastX:input.mx,lastY:input.my,moved:false};
-      return;
-    }
     if(state.arcade.active && state.arcade.mode==='gate'){
       gateStop();
       return;
@@ -76,12 +64,6 @@
   }
   function onPointerUp(e){
     const p=canvasPos(e); input.mx=p.x; input.my=p.y; input.down=false;
-    if(state.ui.researchOverlay && state.ui.researchOverlay.open){
-      const pan=state.ui.researchOverlay.pan||{moved:false};
-      state.ui.researchOverlay.pan={active:false,lastX:0,lastY:0,moved:false};
-      if(!pan.moved) dispatchClick(p.x,p.y);
-      return;
-    }
     if(state.ui.scrollDrag.active){
       state.ui.scrollVel+=-state.ui.scrollDrag.vy*0.8;
       state.ui.scrollDrag={active:false,lastY:0,vy:0,tab:null};
@@ -107,7 +89,6 @@
       if(e.key==='Escape') endArcade();
       return;
     }
-    if(state.ui.researchOverlay && state.ui.researchOverlay.open && e.key==='Escape'){ state.ui.researchOverlay.open=false; return; }
     if(e.key==='e'||e.key==='E') doExport();
     if(e.key==='i'||e.key==='I') doImport();
     if(e.key==='p'||e.key==='P') tryAscend();
@@ -145,7 +126,7 @@
   ];
 
   const state={
-    __version:10,
+    __version:9,
     bits:0,bitsTotal:0,lifetimeBits:0,
     rp:0,rpTotal:0,
     clickBase:1,clickMult:1,
@@ -156,9 +137,13 @@
     upgrades:[],tech:[],achievements:[],
     ascend:{cores:0,best:0},
     settings:{particles:true,mute:false,lowFX:false},
+    // hidden cheat
+    cheat:{unlocked:false,taps:0,req:50,x10:false},
     lastSave:Date.now(),
     tab:'Forge',buyQtyIndex:0,
-    scroll:{Forge:0,Shop:0,Research:0,Arcade:0,Achievements:0,Stats:0,Ascend:0,Settings:0},
+    // research category tab index
+    researchCat:0,
+    scroll:{Forge:0,Shop:0,Research:0,Arcade:0,Achievements:0,Stats:0,Ascend:0,Settings:0,Cheats:0},
     glitch:{next:rand(18,40),life:0,x:0,y:0,active:false,value:0},
     rift:{timer:rand(140,220),active:false,hp:0,hpMax:0,bitsReward:0,rpReward:0,prize:'bits',ttl:0,open:0,closing:false,wobble:0,stars:[]},
     particles:[],toast:[],
@@ -166,8 +151,7 @@
     clickArea:null,
     ui:{
       drawerOpen:false,scale:1,sideRect:null,maxScroll:0,
-      scrollDrag:{active:false,lastY:0,vy:0,tab:null},scrollVel:0,
-      researchOverlay:{open:false,camX:0,camY:0,hover:null,pan:{active:false,lastX:0,lastY:0,moved:false},treeIndex:0}
+      scrollDrag:{active:false,lastY:0,vy:0,tab:null},scrollVel:0
     },
   };
 
@@ -175,77 +159,77 @@
   const mods={clickCurve:1,rpGain:1,arcadeReward:1,riftHP:1,gateZone:1,pulseSize:1,pulseLife:1,costMult:1,glitchRate:1,riftReward:1};
   const BUY_QTY=[1,10,100,'Max'];
 
-  // ===== RESEARCH TREES (linear; separate categories) =====
+  // ===== RESEARCH TREES (linear categories) =====
   const TREES=[
     {name:'Core', id:'core', items:[
-      {id:'t_over1',  tier:0, rp:50,  pre:[],              name:'Overclock I',     desc:'+10% global',  apply:()=>{mults.global*=1.10;}},
-      {id:'t_curve',  tier:1, rp:25,  pre:['t_over1'],     name:'Harmonic Clicks', desc:'Pulses hit harder', apply:()=>{mods.clickCurve*=1.5;}},
-      {id:'t_glitch', tier:1, rp:80,  pre:['t_over1'],     name:'Glitch Magnet',   desc:'+50% Glitch orbs', apply:()=>{mults.glitch*=1.5;}},
-      {id:'t_combo',  tier:2, rp:150, pre:['t_curve'],     name:'Flux Combo',      desc:'Higher combo cap', apply:()=>{state.combo.max=0.8; state.combo.decay=0.09;}},
-      {id:'t_corecrit',tier:2,rp:200, pre:['t_curve'],     name:'Widen Crit',      desc:'Wider crit arc', apply:()=>{state.critZone.lo=Math.max(0,state.critZone.lo-0.05); state.critZone.hi=Math.min(1,state.critZone.hi+0.02);}},
-      {id:'t_over2',  tier:3, rp:200, pre:['t_over1'],     name:'Overclock II',    desc:'+20% global', apply:()=>{mults.global*=1.20;}},
-      {id:'t_click2', tier:3, rp:500, pre:['t_curve'],     name:'Pulse Overdrive', desc:'+50% click payout', apply:()=>{state.clickMult*=1.5;}},
-      {id:'t_over3',  tier:4, rp:450, pre:['t_over2'],     name:'Overclock III',   desc:'+25% global', apply:()=>{mults.global*=1.25;}},
-      {id:'t_charge1',tier:4, rp:680, pre:['t_over2'],     name:'Charge Tuning I', desc:'Charge fills faster', apply:()=>{state.charge.tMax=Math.max(1.2,state.charge.tMax*0.92);}},
-      {id:'t_crit2',  tier:4, rp:700, pre:['t_corecrit'],  name:'Critical Expansion', desc:'Even wider crit arc', apply:()=>{state.critZone.lo=Math.max(0,state.critZone.lo-0.03); state.critZone.hi=Math.min(1,state.critZone.hi+0.02);}},
-      {id:'t_over4',  tier:5, rp:950, pre:['t_over3'],     name:'Overclock IV',    desc:'+30% global', apply:()=>{mults.global*=1.30;}},
-      {id:'t_click3', tier:5, rp:1400,pre:['t_click2'],    name:'Pulse Overdrive II', desc:'+75% click payout', apply:()=>{state.clickMult*=1.75;}},
-      {id:'t_charge2',tier:5, rp:1200,pre:['t_charge1'],   name:'Charge Tuning II', desc:'Charge fills much faster', apply:()=>{state.charge.tMax=Math.max(1.1,state.charge.tMax*0.88);}}
+      {id:'t_over1',tier:0,rp:50, pre:[],             name:'Overclock I',     desc:'+10% global',       apply:()=>{mults.global*=1.10;}},
+      {id:'t_curve',tier:0,rp:25, pre:[],             name:'Harmonic Clicks', desc:'Pulses hit harder',  apply:()=>{mods.clickCurve*=1.5;}},
+      {id:'t_glitch',tier:1,rp:80, pre:['t_over1'],   name:'Glitch Magnet',   desc:'+50% Glitch orbs',  apply:()=>{mults.glitch*=1.5;}},
+      {id:'t_combo', tier:1,rp:150,pre:['t_curve'],   name:'Flux Combo',      desc:'Higher combo cap',   apply:()=>{state.combo.max=0.8; state.combo.decay=0.09;}},
+      {id:'t_over2',tier:2,rp:200,pre:['t_over1'],    name:'Overclock II',    desc:'+20% global',       apply:()=>{mults.global*=1.20;}},
+      {id:'t_corecrit',tier:2,rp:200,pre:['t_curve'], name:'Widen Crit',      desc:'Wider crit arc',     apply:()=>{state.critZone.lo=Math.max(0,state.critZone.lo-0.05); state.critZone.hi=Math.min(1,state.critZone.hi+0.02);}},
+      {id:'t_over3',tier:3,rp:450,pre:['t_over2'],    name:'Overclock III',   desc:'+25% global',       apply:()=>{mults.global*=1.25;}},
+      {id:'t_click2',tier:3,rp:500,pre:['t_curve'],   name:'Pulse Overdrive', desc:'+50% click payout', apply:()=>{state.clickMult*=1.5;}},
+      {id:'t_over4',tier:4,rp:950,pre:['t_over3'],    name:'Overclock IV',    desc:'+30% global',       apply:()=>{mults.global*=1.30;}},
+      {id:'t_crit2', tier:4,rp:700,pre:['t_corecrit'],name:'Critical Expansion',desc:'Even wider crit',  apply:()=>{state.critZone.lo=Math.max(0,state.critZone.lo-0.03); state.critZone.hi=Math.min(1,state.critZone.hi+0.02);}},
+      {id:'t_charge1',tier:4,rp:680,pre:['t_over2'],  name:'Charge Tuning I', desc:'Charge fills faster',apply:()=>{state.charge.tMax=Math.max(1.2,state.charge.tMax*0.92);}},
+      {id:'t_over5',tier:5,rp:1600,pre:['t_over4'],   name:'Overclock V',     desc:'+35% global',       apply:()=>{mults.global*=1.35;}},
+      {id:'t_click3',tier:5,rp:1400,pre:['t_click2'], name:'Pulse Overdrive II',desc:'+75% click payout',apply:()=>{state.clickMult*=1.75;}},
+      {id:'t_charge2',tier:5,rp:1200,pre:['t_charge1'],name:'Charge Tuning II',desc:'Charge much faster', apply:()=>{state.charge.tMax=Math.max(1.1,state.charge.tMax*0.88);}}
     ]},
     {name:'Labs', id:'labs', items:[
-      {id:'t_lab',    tier:0, rp:120, pre:[],              name:'Lab Protocols',   desc:'+60% RP gain', apply:()=>{mods.rpGain*=1.6;}},
-      {id:'t_riftdmp',tier:1, rp:300, pre:['t_lab'],       name:'Rift Dampers',    desc:'Rifts easier',  apply:()=>{mods.riftHP*=0.8;}},
-      {id:'t_lab2',   tier:2, rp:700, pre:['t_lab'],       name:'Institute Grants',desc:'+50% RP gain', apply:()=>{mods.rpGain*=1.5;}},
-      {id:'t_rift2',  tier:3, rp:900, pre:['t_riftdmp'],   name:'Rift Shunts',     desc:'Rifts even easier', apply:()=>{mods.riftHP*=0.85;}},
-      {id:'t_mods',   tier:4, rp:600, pre:['t_lab2'],      name:'Module Eff.',     desc:'+20% modules', apply:()=>{mults.modules*=1.2;}},
-      {id:'t_lab3',   tier:4, rp:1200,pre:['t_lab2'],      name:'Grand Fellowship',desc:'+45% RP gain', apply:()=>{mods.rpGain*=1.45;}},
-      {id:'t_cost1',  tier:5, rp:900, pre:['t_mods'],      name:'Bulk Procurement',desc:'Shop costs -5%', apply:()=>{mods.costMult*=0.95;}},
-      {id:'t_cost2',  tier:6, rp:1500,pre:['t_cost1'],     name:'Megascale Contracts',desc:'Shop costs -8%', apply:()=>{mods.costMult*=0.92;}},
-      {id:'t_rift3',  tier:6, rp:1400,pre:['t_rift2'],     name:'Rift Nullifiers', desc:'Rifts trivialized', apply:()=>{mods.riftHP*=0.85;}},
-      {id:'t_riftrew',tier:6, rp:1300,pre:['t_rift2'],     name:'Rift Dividends',  desc:'+40% Rift rewards', apply:()=>{mods.riftReward*=1.4;}},
-      {id:'t_glitchrate',tier:3,rp:700,pre:['t_lab'],      name:'Glitch Beacon',   desc:'More Glitch spawns', apply:()=>{mods.glitchRate*=1.35;}}
+      {id:'t_lab',    tier:0,rp:120,pre:['t_over1'],     name:'Lab Protocols',    desc:'+60% RP gain',      apply:()=>{mods.rpGain*=1.6;}},
+      {id:'t_riftdmp',tier:1,rp:300,pre:['t_lab'],       name:'Rift Dampers',     desc:'Rifts easier',       apply:()=>{mods.riftHP*=0.8;}},
+      {id:'t_lab2',   tier:2,rp:700,pre:['t_lab'],       name:'Institute Grants', desc:'+50% RP gain',      apply:()=>{mods.rpGain*=1.5;}},
+      {id:'t_rift2',  tier:3,rp:900,pre:['t_riftdmp'],   name:'Rift Shunts',      desc:'Rifts even easier',  apply:()=>{mods.riftHP*=0.85;}},
+      {id:'t_mods',   tier:4,rp:600,pre:['t_over3'],     name:'Module Eff.',      desc:'+20% modules',      apply:()=>{mults.modules*=1.2;}},
+      {id:'t_lab3',   tier:4,rp:1200,pre:['t_lab2'],     name:'Grand Fellowship', desc:'+45% RP gain',      apply:()=>{mods.rpGain*=1.45;}},
+      {id:'t_cost1',  tier:5,rp:900,pre:['t_mods'],      name:'Bulk Procurement', desc:'Shop costs -5%',     apply:()=>{mods.costMult*=0.95;}},
+      {id:'t_cost2',  tier:6,rp:1500,pre:['t_cost1'],    name:'Megascale Contracts',desc:'Shop costs -8%',    apply:()=>{mods.costMult*=0.92;}},
+      {id:'t_rift3',  tier:6,rp:1400,pre:['t_rift2'],    name:'Rift Nullifiers',  desc:'Rifts trivialized',  apply:()=>{mods.riftHP*=0.85;}},
+      {id:'t_riftrew',tier:6,rp:1300,pre:['t_rift2'],    name:'Rift Dividends',   desc:'+40% Rift rewards', apply:()=>{mods.riftReward*=1.4;}},
+      {id:'t_glitchrate',tier:3,rp:700,pre:['t_glitch'], name:'Glitch Beacon',    desc:'More Glitch spawns', apply:()=>{mods.glitchRate*=1.35;}}
     ]},
     {name:'Arcade', id:'arcade', items:[
-      {id:'t_gate',   tier:0, rp:220, pre:[],              name:'Gate Precision',  desc:'Easier Timing Gate', apply:()=>{mods.gateZone*=1.25;}},
-      {id:'t_pulse',  tier:0, rp:180, pre:[],              name:'Pulse Tuning',    desc:'Bigger/longer Pulse Rush', apply:()=>{mods.pulseSize*=1.15; mods.pulseLife*=1.2;}},
-      {id:'t_arcade', tier:1, rp:260, pre:['t_pulse'],     name:'Arcade Grants',   desc:'+30% arcade rewards', apply:()=>{mods.arcadeReward*=1.3;}},
-      {id:'t_arcade2',tier:2, rp:520, pre:['t_arcade'],    name:'Arcade Stipend',  desc:'+25% arcade rewards', apply:()=>{mods.arcadeReward*=1.25;}},
-      {id:'t_pulse2', tier:3, rp:600, pre:['t_pulse'],     name:'Pulse Tuning II', desc:'Even bigger/longer', apply:()=>{mods.pulseSize*=1.2; mods.pulseLife*=1.2;}},
-      {id:'t_gate2',  tier:3, rp:620, pre:['t_gate'],      name:'Gate Precision II',desc:'Much easier Gate', apply:()=>{mods.gateZone*=1.2;}},
-      {id:'t_arcade3',tier:4, rp:820, pre:['t_arcade2'],   name:'Arcade Endowment',desc:'+25% arcade rewards', apply:()=>{mods.arcadeReward*=1.25;}},
-      {id:'t_arcade4',tier:5, rp:1200,pre:['t_arcade3'],   name:'Arcade Jackpot',  desc:'+25% arcade rewards', apply:()=>{mods.arcadeReward*=1.25;}}
+      {id:'t_gate',   tier:0,rp:220,pre:['t_curve'],     name:'Gate Precision',   desc:'Easier Timing Gate',   apply:()=>{mods.gateZone*=1.25;}},
+      {id:'t_pulse',  tier:0,rp:180,pre:['t_curve'],     name:'Pulse Tuning',     desc:'Bigger/longer Pulse',  apply:()=>{mods.pulseSize*=1.15; mods.pulseLife*=1.2;}},
+      {id:'t_arcade', tier:1,rp:260,pre:['t_lab'],       name:'Arcade Grants',    desc:'+30% arcade rewards', apply:()=>{mods.arcadeReward*=1.3;}},
+      {id:'t_arcade2',tier:2,rp:520,pre:['t_arcade'],    name:'Arcade Stipend',   desc:'+25% arcade rewards', apply:()=>{mods.arcadeReward*=1.25;}},
+      {id:'t_pulse2', tier:3,rp:600,pre:['t_pulse'],     name:'Pulse Tuning II',  desc:'Even bigger/longer',   apply:()=>{mods.pulseSize*=1.2; mods.pulseLife*=1.2;}},
+      {id:'t_gate2',  tier:3,rp:620,pre:['t_gate'],      name:'Gate Precision II',desc:'Much easier Gate',     apply:()=>{mods.gateZone*=1.2;}},
+      {id:'t_arcade3',tier:4,rp:820,pre:['t_arcade2'],   name:'Arcade Endowment', desc:'+25% arcade rewards', apply:()=>{mods.arcadeReward*=1.25;}},
+      {id:'t_arcade4',tier:5,rp:1200,pre:['t_arcade3'],  name:'Arcade Jackpot',   desc:'+25% arcade rewards', apply:()=>{mods.arcadeReward*=1.25;}}
     ]},
     {name:'Quantum', id:'quantum', items:[
-      {id:'t_combo2', tier:1, rp:420, pre:[],              name:'Combo Sustain',   desc:'Slower combo decay', apply:()=>{state.combo.decay=Math.max(0.05,state.combo.decay*0.7);}},
-      {id:'t_time',   tier:2, rp:700, pre:['t_combo2'],    name:'Time Compression',desc:'Charge faster', apply:()=>{state.charge.tMax=Math.max(1.2,state.charge.tMax*0.9);}},
-      {id:'t_glob',   tier:3, rp:1400,pre:['t_time'],      name:'Planck Shift',    desc:'+15% global', apply:()=>{mults.global*=1.15;}},
-      {id:'t_combo3', tier:4, rp:1600,pre:['t_combo2'],    name:'Combo Lock',      desc:'Higher combo cap', apply:()=>{state.combo.max=1.0;}},
-      {id:'t_glob2',  tier:5, rp:2100,pre:['t_glob'],      name:'Vacuum Symmetry', desc:'+20% global', apply:()=>{mults.global*=1.20;}},
-      {id:'t_qtime2', tier:5, rp:1800,pre:['t_time'],      name:'Temporal Folding',desc:'Charge even faster', apply:()=>{state.charge.tMax=Math.max(1.0,state.charge.tMax*0.85);}},
-      {id:'t_combo4', tier:6, rp:2400,pre:['t_combo3'],    name:'Combo Anchor',    desc:'Cap + decay ↓', apply:()=>{state.combo.max=1.2; state.combo.decay=Math.max(0.04,state.combo.decay*0.75);}}
+      {id:'t_combo2', tier:1,rp:420,pre:['t_combo'],     name:'Combo Sustain',    desc:'Slower combo decay',   apply:()=>{state.combo.decay=Math.max(0.05,state.combo.decay*0.7);}},
+      {id:'t_time',   tier:2,rp:700,pre:['t_click2'],    name:'Time Compression', desc:'Charge faster',        apply:()=>{state.charge.tMax=Math.max(1.2,state.charge.tMax*0.9);}},
+      {id:'t_glob',   tier:3,rp:1400,pre:['t_over4'],    name:'Planck Shift',     desc:'+15% global',         apply:()=>{mults.global*=1.15;}},
+      {id:'t_combo3', tier:4,rp:1600,pre:['t_combo2'],   name:'Combo Lock',       desc:'Higher combo cap',     apply:()=>{state.combo.max=1.0;}},
+      {id:'t_glob2',  tier:5,rp:2100,pre:['t_glob'],     name:'Vacuum Symmetry',  desc:'+20% global',         apply:()=>{mults.global*=1.20;}},
+      {id:'t_qtime2', tier:5,rp:1800,pre:['t_time'],     name:'Temporal Folding', desc:'Charge even faster',   apply:()=>{state.charge.tMax=Math.max(1.0,state.charge.tMax*0.85);}},
+      {id:'t_combo4', tier:6,rp:2400,pre:['t_combo3'],   name:'Combo Anchor',     desc:'Cap + decay ↓',        apply:()=>{state.combo.max=1.2; state.combo.decay=Math.max(0.04,state.combo.decay*0.75);}}
     ]},
     {name:'Economy', id:'economy', items:[
-      {id:'e_bulk', tier:0, rp:180, pre:[], name:'Bulk Logistics', desc:'Module output +10%', apply:()=>{mults.modules*=1.10;}},
-      {id:'e_vendor', tier:1, rp:350, pre:['e_bulk'], name:'Vendor Network', desc:'Shop costs -6%', apply:()=>{mods.costMult=(mods.costMult||1)*0.94;}},
-      {id:'e_synergy', tier:2, rp:520, pre:['e_bulk'], name:'Synergy Matrices', desc:'Module output +15%', apply:()=>{mults.modules*=1.15;}},
-      {id:'e_broker', tier:3, rp:850, pre:['e_vendor'], name:'Dimensional Brokers', desc:'Shop costs -8%', apply:()=>{mods.costMult=(mods.costMult||1)*0.92;}},
-      {id:'e_overdrive', tier:3, rp:900, pre:['e_synergy'], name:'Overdrive Plants', desc:'+10% global', apply:()=>{mults.global*=1.10;}},
-      {id:'e_network', tier:4, rp:1200, pre:['e_broker'], name:'Parallel Supply', desc:'Module output +20%', apply:()=>{mults.modules*=1.20;}}
+      {id:'e_bulk',      tier:0,rp:180,pre:[],            name:'Bulk Logistics',      desc:'Module output +10%', apply:()=>{mults.modules*=1.10;}},
+      {id:'e_vendor',    tier:1,rp:350,pre:['e_bulk'],    name:'Vendor Network',      desc:'Shop costs -6%',     apply:()=>{mods.costMult=(mods.costMult||1)*0.94;}},
+      {id:'e_synergy',   tier:2,rp:520,pre:['e_bulk'],    name:'Synergy Matrices',    desc:'Module output +15%', apply:()=>{mults.modules*=1.15;}},
+      {id:'e_broker',    tier:3,rp:850,pre:['e_vendor'],  name:'Dimensional Brokers', desc:'Shop costs -8%',     apply:()=>{mods.costMult=(mods.costMult||1)*0.92;}},
+      {id:'e_overdrive', tier:3,rp:900,pre:['e_synergy'], name:'Overdrive Plants',    desc:'+10% global',       apply:()=>{mults.global*=1.10;}},
+      {id:'e_network',   tier:4,rp:1200,pre:['e_broker'], name:'Parallel Supply',     desc:'Module output +20%', apply:()=>{mults.modules*=1.20;}}
     ]},
     {name:'Defense', id:'defense', items:[
-      {id:'d_warn', tier:0, rp:200, pre:[], name:'Beam Early Warning', desc:'Safer lasers in Meteor', apply:()=>{mods.beamWarn=(mods.beamWarn||1)*1.25;}},
-      {id:'d_cushion', tier:1, rp:300, pre:['d_warn'], name:'Kinetic Cushion', desc:'Arcade penalties -20%', apply:()=>{mods.damageShield=(mods.damageShield||1)*0.8;}},
-      {id:'d_observer', tier:2, rp:520, pre:['d_warn'], name:'Trajectory Observer', desc:'Gate leniency +10%', apply:()=>{mods.gateZone*=1.10;}},
-      {id:'d_reflect', tier:3, rp:900, pre:['d_cushion'], name:'Reflective Mesh', desc:'+10% global', apply:()=>{mults.global*=1.10;}}
+      {id:'d_warn',     tier:0,rp:200,pre:[],           name:'Beam Early Warning', desc:'(placeholder effect)', apply:()=>{mods.beamWarn=(mods.beamWarn||1)*1.25;}},
+      {id:'d_cushion',  tier:1,rp:300,pre:['d_warn'],   name:'Kinetic Cushion',    desc:'Arcade penalties -20%', apply:()=>{mods.damageShield=(mods.damageShield||1)*0.8;}},
+      {id:'d_observer', tier:2,rp:520,pre:['d_warn'],   name:'Trajectory Observer',desc:'Gate wider + pulses last', apply:()=>{mods.gateZone*=1.05; mods.pulseLife*=1.1;}},
+      {id:'d_reflect',  tier:3,rp:900,pre:['d_cushion'],name:'Reflective Mesh',    desc:'+10% global',          apply:()=>{mults.global*=1.10;}}
     ]}
   ];
 
-  // Flatten TECH for logic
   const TECH = TREES.flatMap(tr => tr.items.map(it => ({...it, tree: tr.id})));
-  const SAVE_KEY=('quantum_forge_v10@'+(location.host||'local'));
+  const SAVE_KEY=('quantum_forge_v7@'+(location.host||'local'));
+
   function ensureDefaults(){
     state.ui = state.ui || {drawerOpen:false,scale:1,sideRect:null,maxScroll:0,scrollDrag:{active:false,lastY:0,vy:0,tab:null},scrollVel:0};
-    if(!state.ui.researchOverlay){ state.ui.researchOverlay={open:false,camX:0,camY:0,hover:null,pan:{active:false,lastX:0,lastY:0,moved:false},treeIndex:0}; }
     const byId={}; (state.modules||[]).forEach(m=>{byId[m.id]=m;});
     state.modules = MODULES.map(m => byId[m.id] ? {id:m.id,count:byId[m.id].count||0} : {id:m.id,count:0});
   }
@@ -253,9 +237,9 @@
   function load(){
     try{
       let raw=localStorage.getItem(SAVE_KEY);
-      if(!raw) { ensureDefaults(); return; }
+      if(!raw){ ensureDefaults(); return; }
       const d=JSON.parse(raw);
-      const keep=['bits','bitsTotal','lifetimeBits','rp','rpTotal','clickBase','clickMult','charge','critZone','combo','modules','upgrades','tech','achievements','ascend','settings','lastSave','tab','buyQtyIndex','scroll','glitch','rift','particles','toast','arcade','clickArea','ui'];
+      const keep=['bits','bitsTotal','lifetimeBits','rp','rpTotal','clickBase','clickMult','charge','critZone','combo','modules','upgrades','tech','achievements','ascend','settings','cheat','lastSave','tab','buyQtyIndex','researchCat','scroll','glitch','rift','particles','toast','arcade','clickArea','ui'];
       for(const k of keep){ if(k in d) state[k]=d[k]; }
       if(d.mults) Object.assign(mults,d.mults);
       if(d.mods) Object.assign(mods,d.mods);
@@ -306,38 +290,47 @@
   function techAvailable(t){return !hasTech(t.id)&&t.pre.every(p=>hasTech(p));}
   function buyTech(t){if(!techAvailable(t)||state.rp<t.rp)return; state.rp-=t.rp; state.tech.push(t.id); t.apply(); toast(`Researched: ${t.name}`); beep(760,0.05,0.03);}
 
-// replace the old lifetime version with this:
-function coreGain(){
-  return Math.floor(Math.sqrt(state.bits / 1e6));
-}
+  // CORE GAIN: current bits only (not lifetime)
+  function coreGain(){
+    return Math.floor(Math.sqrt(state.bits / 1e6));
+  }
 
-function tryAscend(){
-  const gain = coreGain();
-  if (gain <= 0) { toast('Generate more Bits to ascend'); return; }
-  state.ascend.cores += gain;
-  state.ascend.best = Math.max(state.ascend.best, state.ascend.cores);
-  state.bits = 0;
-  state.bitsTotal = 0;
-  state.clickBase = 1;
-  state.clickMult = 1;
-  state.modules = MODULES.map(m => ({id: m.id, count: 0}));
-  state.upgrades = [];
-  state.rp = 0;
-  state.tech = []; 
-  mults.global = 1; mults.modules = 1; mults.glitch = 1; mults.combo = 1;
-  Object.assign(mods, {
-    clickCurve: 1, rpGain: 1, arcadeReward: 1, riftHP: 1, gateZone: 1,
-    pulseSize: 1, pulseLife: 1, flappyGravity: 1, ringLeniency: 1,
-    costMult: 1, glitchRate: 1, riftReward: 1
-  });
-  state.charge = {active:false, t:0, tMax:1.6};
-  state.critZone = {lo:0.92, hi:1.0, mult:3};
-  state.combo = {v:0, max:0.5, decay:0.12};
-  state.glitch = {next:rand(18,40), life:0, x:0, y:0, active:false, value:0};
-  toast(`Ascended: +${gain} core(s) → global x${(1 + state.ascend.cores*0.1).toFixed(2)}`);
-  beep(880, 0.07, 0.03);
-  save();
-}
+  // Ascend resets research + multipliers
+  function tryAscend(){
+    const gain = coreGain();
+    if (gain <= 0) { toast('Generate more Bits to ascend'); return; }
+
+    state.ascend.cores += gain;
+    state.ascend.best = Math.max(state.ascend.best, state.ascend.cores);
+
+    state.bits = 0;
+    state.bitsTotal = 0;
+    state.clickBase = 1;
+    state.clickMult = 1;
+    state.modules = MODULES.map(m => ({id: m.id, count: 0}));
+    state.upgrades = [];
+    state.rp = 0;
+
+    // reset research
+    state.tech = [];
+    // restore multipliers/modifiers defaults
+    mults.global = 1; mults.modules = 1; mults.glitch = 1; mults.combo = 1;
+    Object.assign(mods, {
+      clickCurve: 1, rpGain: 1, arcadeReward: 1, riftHP: 1, gateZone: 1,
+      pulseSize: 1, pulseLife: 1, costMult: 1, glitchRate: 1, riftReward: 1
+    });
+    // restore state influenced by tech
+    state.charge = {active:false, t:0, tMax:1.6};
+    state.critZone = {lo:0.92, hi:1.0, mult:3};
+    state.combo = {v:0, max:0.5, decay:0.12};
+
+    // misc reset
+    state.glitch = {next:rand(18,40), life:0, x:0, y:0, active:false, value:0};
+
+    toast(`Ascended: +${gain} core(s) → global x${(1 + state.ascend.cores*0.1).toFixed(2)}`);
+    beep(880, 0.07, 0.03);
+    save();
+  }
 
   function updateGlitch(dt){
     const g=state.glitch;
@@ -441,7 +434,7 @@ function tryAscend(){
     if(!input.down){state.charge.active=false;}
   }
 
-  // ===== Arcade (kept: pulse, gate, meteor) =====
+  // ===== Arcade (Pulse / Gate / Meteor only) =====
   function startPulseRush(){
     state.arcade.active=true; state.arcade.mode='pulse'; state.arcade.t=25; state.arcade.score=0; state.arcade.pulses=[];
     state.arcade.pulse={spawn:0.65,life:2.4*mods.pulseLife,rMin:22*mods.pulseSize,rMax:42*mods.pulseSize,maxOnScreen:8};
@@ -461,17 +454,6 @@ function tryAscend(){
       speed
     };
     toast('Meteor Dodge+: dodge meteors, shards & lasers.');
-  }
-
-  function spawnBeam(M){
-    const horizontal=Math.random()<0.5;
-    if(horizontal){
-      const y=rand(120*DPR, CANVAS.height-120*DPR);
-      M.beams.push({dir:'h',pos:y,phase:'warn',t:0.75,fire:1.00,th:26*DPR});
-    }else{
-      const x=rand(80*DPR, CANVAS.width-80*DPR);
-      M.beams.push({dir:'v',pos:x,phase:'warn',t:0.75,fire:1.00,th:26*DPR});
-    }
   }
 
   function updateArcade(dt){
@@ -510,10 +492,28 @@ function tryAscend(){
       for(let i=M.shards.length-1;i>=0;i--){const k=M.shards[i]; if(hitCircle(k.x,k.y,k.r)){ penalize(2.5); M.shards.splice(i,1);}}
       for(const b of M.beams){ if(b.phase!=='fire') continue; if(b.dir==='h'){ const y=b.pos, half=b.th/2; if(M.py>y-half && M.py<y+half){ penalize(6); } } else { const x=b.pos, half=b.th/2; if(M.px>x-half && M.px<x+half){ penalize(6); } } }
       for(let i=M.stars.length-1;i>=0;i--){const k=M.stars[i]; if(hitCircle(k.x,k.y,k.r)){ A.score+=3; addRP(0.5*mods.rpGain); beep(900,0.03,0.02,'triangle'); particleBurst(k.x,k.y,6,'#a7f3d0'); M.stars.splice(i,1);}}
-
     }
   }
-
+  function spawnBeam(M){
+    const horizontal=Math.random()<0.5;
+    if(horizontal){
+      const y=rand(120*DPR, CANVAS.height-120*DPR);
+      M.beams.push({dir:'h',pos:y,phase:'warn',t:0.75,fire:1.00,th:26*DPR});
+    }else{
+      const x=rand(80*DPR, CANVAS.width-80*DPR);
+      M.beams.push({dir:'v',pos:x,phase:'warn',t:0.75,fire:1.00,th:26*DPR});
+    }
+  }
+  function endArcade(){
+    if(!state.arcade.active) return;
+    const s=Math.max(0,Math.floor(state.arcade.score)); const mode=state.arcade.mode; state.arcade.active=false;
+    let bits=0,rp=0;
+    if(mode==='pulse'){bits=s*3;rp=s*0.3;}
+    else if(mode==='gate'){bits=s*8;rp=s*0.6;}
+    else if(mode==='meteor'){bits=s*6;rp=s*0.45;}
+    bits*=mods.arcadeReward; rp*=mods.arcadeReward;
+    if(bits||rp){addBits(bits);addRP(rp);toast(`Arcade reward: +${fmt(bits)} bits, +${fmt(rp)} RP`);}
+  }
   function drawArcade(){
     if(!state.arcade.active) return;
     const A=state.arcade;
@@ -558,86 +558,67 @@ function tryAscend(){
     }
   }
 
-  // ===== Research Overlay (LINEAR + tabs per category) =====
-  function drawResearchOverlay(){
-    if(!(state.ui.researchOverlay && state.ui.researchOverlay.open)) return;
-    const O=state.ui.researchOverlay;
-    const tree = TREES[O.treeIndex % TREES.length];
-    const items = tree.items;
-    CTX.globalAlpha=0.92; CTX.fillStyle='#03060a'; CTX.fillRect(0,0,CANVAS.width,CANVAS.height); CTX.globalAlpha=1;
+  function drawResearchList(tree){
+    const items = tree.items.slice().sort((a,b)=> (a.tier-b.tier) || a.rp-b.rp );
+    const listX=state.ui.sideRect.x, listY=state.ui.sideRect.y, listW=state.ui.sideRect.w;
+    let y=listY - (state.scroll[state.tab]||0) + 44*DPR; // push below category tabs
 
-    // Header
-    CTX.fillStyle='#e6eef6'; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='left';
-    CTX.fillText(`Research Tree — drag to pan • hover nodes for details • click to research`,12*DPR,20*DPR);
-
-    // Tabs
-    const tabH=28*DPR, gap=8*DPR;
-    let tx=12*DPR, ty=36*DPR;
-    for(let i=0;i<TREES.length;i++){
-      const t=TREES[i]; const w=measure(t.name,12*DPR,'700')*DPR+24*DPR;
-      const active=(i===O.treeIndex);
-      CTX.fillStyle=active?'#1e2a38':'#11161d'; roundRect(tx,ty,w,tabH,10*DPR,true,false);
-      CTX.fillStyle=active?'#e6eef6':'#8aa0ba'; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(t.name,tx+w/2,ty+tabH/2);
-      addClick(tx,ty,w,tabH,(()=>{const idx=i; return ()=>{O.treeIndex=idx;};})());
-      tx+=w+gap;
+    // category tabs
+    const cats=TREES.map(t=>t.name);
+    const tabW = Math.max(88*DPR, (listW-20*DPR)/cats.length);
+    let tx=listX+10*DPR, ty=listY+6*DPR, th=28*DPR;
+    for(let i=0;i<cats.length;i++){
+      const active=(i===state.researchCat);
+      CTX.fillStyle=active?'#1a222b':'#0f141a'; roundRect(tx,ty,tabW,th,8*DPR,true,false);
+      CTX.fillStyle=active?'#e2ebf5':'#9fb0c6'; CTX.font=`700 ${11*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle';
+      CTX.fillText(cats[i],tx+tabW/2,ty+th/2);
+      addClick(tx,ty,tabW,th,()=>{ state.researchCat=i; state.scroll.Research=0; });
+      tx+=tabW+6*DPR;
     }
 
-    // Close
-    const closeW=44*DPR, closeH=32*DPR; const cbx=CANVAS.width-closeW-18*DPR, cby=18*DPR;
-    drawButton(cbx,cby,closeW,closeH,'✕',true,true); addClick(cbx,cby,closeW,closeH,()=>{O.open=false;});
-
-    // Layout - linear by tier
-    const originX=(CANVAS.width/2)+O.camX, originY=(CANVAS.height*0.18)+O.camY;
-    const rowStep=130*DPR, colStep=210*DPR;
-
-    const byTier={};
-    for(const it of items){ const t=it.tier||0; (byTier[t]=byTier[t]||[]).push(it); }
-    const tiers=Object.keys(byTier).map(n=>+n).sort((a,b)=>a-b);
-
-    const posMap={};
-    for(const tier of tiers){
-      const arr=byTier[tier];
-      const k=arr.length;
-      for(let i=0;i<k;i++){
-        const x=originX + (i-(k-1)/2)*colStep;
-        const y=originY + tier*rowStep;
-        posMap[arr[i].id]={x,y};
-      }
+    for(const t of items){
+      const rowH=56*DPR; CTX.fillStyle='#121821'; roundRect(listX+10*DPR,y,listW-20*DPR,rowH,10*DPR,true,false);
+      const owned=hasTech(t.id); const can=state.rp>=t.rp && techAvailable(t);
+      CTX.fillStyle=owned?'#c8f7da':'#e6eef6'; CTX.font=`700 ${14*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top';
+      CTX.fillText(`${t.name} — ${t.rp} RP`,listX+22*DPR,y+10*DPR);
+      CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR}px Inter`; CTX.fillText(t.desc,listX+22*DPR,y+28*DPR);
+      const bw=96*DPR,bh=28*DPR; const bx=listX+listW-bw-22*DPR, by=y+rowH-bh-12*DPR;
+      drawButton(bx,by,bw,bh, owned?'Owned':'Research', can, true);
+      if(can) addClick(bx,by,bw,bh,()=>buyTech(t));
+      y+=rowH+8*DPR;
     }
+    // set max scroll
+    const listH=state.ui.sideRect.h;
+    state.ui.maxScroll=Math.max(0,(y-(listY+listH)));
+  }
 
-    // Edges
-    CTX.strokeStyle='#223142'; CTX.lineWidth=2*DPR;
-    CTX.lineCap='round';
-    for(const it of items){
-      const a=posMap[it.id]; if(!a) continue;
-      for(const pre of it.pre){
-        const p=techById(pre); if(!p || p.tree!==tree.id) continue;
-        const b=posMap[pre]; if(!b) continue;
-        CTX.beginPath(); CTX.moveTo(a.x,a.y-20*DPR); CTX.lineTo(b.x,b.y+20*DPR); CTX.stroke();
-      }
-    }
-
-    // Nodes
-    O.hover=null;
-    for(const it of items){
-      const pos=posMap[it.id]; if(!pos) continue;
-      const owned=hasTech(it.id); const avail=techAvailable(it)&&state.rp>=it.rp;
-      const r=18*DPR;
-      CTX.fillStyle=owned?'#1f3427':(avail?'#1f2631':'#11161d'); CTX.beginPath(); CTX.arc(pos.x,pos.y,r,0,Math.PI*2); CTX.fill();
-      CTX.strokeStyle=avail?'#7fd1ff':'#2a3949'; CTX.lineWidth=2*DPR; CTX.stroke();
-      CTX.fillStyle=owned?'#c8f7da':'#e6eef6'; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='bottom';
-      CTX.fillText(it.name,pos.x,pos.y-r-10*DPR);
-      CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${11*DPR}px Inter`; CTX.textBaseline='top';
-      CTX.fillText(`${it.rp} RP`,pos.x,pos.y+r+6*DPR);
-      const d2=(input.mx-pos.x)**2+(input.my-pos.y)**2; if(d2<=r*r) O.hover=it;
-      addClick(pos.x-r,pos.y-r,r*2,r*2,()=>{ if(techAvailable(it)){ buyTech(it); } });
-    }
-
-    if(O.hover){
-      const t=O.hover; const owned=hasTech(t.id); const avail=techAvailable(t)&&state.rp>=t.rp;
-      const status=owned?'Owned':(avail?'Available':'Locked');
-      tooltip(input.mx,input.my,[t.name,t.desc,`Cost: ${t.rp} RP • ${status}`]);
-    }
+  // ===== Cheats =====
+  function unlockCheats(){ 
+    if(state.cheat.unlocked) return;
+    state.cheat.unlocked = true; 
+    toast('Dev menu unlocked');
+    beep(1200,0.05,0.03,'square');
+    save();
+  }
+  function cheatAddBits(n){ addBits(n); toast(`+${fmt(n)} bits`); }
+  function cheatAddRP(n){ addRP(n); toast(`+${fmt(n)} RP`); }
+  function cheatAddCores(n){
+    state.ascend.cores = Math.max(0, (state.ascend.cores||0) + n);
+    state.ascend.best  = Math.max(state.ascend.best, state.ascend.cores);
+    toast(`Cores: ${state.ascend.cores}`);
+  }
+  function cheatToggleX10(){
+    if(!state.cheat.x10){ mults.global *= 10; state.cheat.x10 = true; toast('Global x10 ON'); }
+    else { mults.global /= 10; state.cheat.x10 = false; toast('Global x10 OFF'); }
+  }
+  function cheatUnlockAll(){
+    for(const t of TECH){ if(!hasTech(t.id)){ state.tech.push(t.id); t.apply(); } }
+    toast('All research unlocked');
+  }
+  function cheatSpawnRift(){ if(!state.rift.active){ state.rift.timer = 0; } }
+  function cheatMaxModules(cnt=100){
+    for(const m of MODULES){ state.modules[m.id].count = cnt; }
+    toast(`All modules set to ${cnt}`);
   }
 
   function gateStop(){
@@ -648,15 +629,10 @@ function tryAscend(){
     if(A.gate.tries<=0) endArcade();
   }
 
-  function endArcade(){
-    if(!state.arcade.active) return;
-    const s=Math.max(0,Math.floor(state.arcade.score)); const mode=state.arcade.mode; state.arcade.active=false;
-    let bits=0,rp=0;
-    if(mode==='pulse'){bits=s*3;rp=s*0.3;}
-    else if(mode==='gate'){bits=s*8;rp=s*0.6;}
-    else if(mode==='meteor'){bits=s*6;rp=s*0.45;}
-    bits*=mods.arcadeReward; rp*=mods.arcadeReward;
-    if(bits||rp){addBits(bits);addRP(rp);toast(`Arcade reward: +${fmt(bits)} bits, +${fmt(rp)} RP`);}
+  function update(dt){
+    addBits(totalPPS()*dt); addRP(rpPerSec()*dt);
+    state.combo.v=clamp(state.combo.v-state.combo.decay*dt,0,state.combo.max);
+    updateGlitch(dt); updateRift(dt); updateArcade(dt); updateCharge(dt); updateParticles(dt); updateToasts(dt);
   }
 
   function draw(dt){
@@ -720,6 +696,7 @@ function tryAscend(){
     if(sidebarW>0){
       CTX.fillStyle='#0f141a'; roundRect(sideX,sideY,sidebarW,sideH,16*DPR,true,false);
       const tabs=['Forge','Shop','Research','Arcade','Achievements','Stats','Ascend','Settings'];
+      if(state.cheat.unlocked) tabs.push('Cheats');
       const tabH=40*DPR; let tx=sideX; const tw=sidebarW/tabs.length; const tabFs=tw<90*DPR?11*DPR:13*DPR;
       for(const tname of tabs){
         const active=state.tab===tname;
@@ -777,22 +754,7 @@ function tryAscend(){
       }
 
       if(state.tab==='Research'){
-        const btnW=220*DPR, btnH=34*DPR;
-        drawButton(listX,y,btnW,btnH,'Open Research',true,true);
-        addClick(listX,y,btnW,btnH,()=>{ state.ui.researchOverlay.open=true; /* keep previous camera offsets */ });
-        y+=btnH+10*DPR;
-
-        const avail = TECH.filter(t=>techAvailable(t)).slice(0,8);
-        for(const t of avail){
-          const rowH=56*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false);
-          CTX.fillStyle='#e6eef6'; CTX.font=`700 ${14*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top';
-          CTX.fillText(`${t.name} — ${t.rp} RP`,listX+12*DPR,y+10*DPR);
-          CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR}px Inter`; CTX.fillText(t.desc,listX+12*DPR,y+28*DPR);
-          const bw=80*DPR,bh=28*DPR; const bx=listX+listW-bw-10*DPR, by=y+rowH-bh-10*DPR;
-          const can=state.rp>=t.rp;
-          drawButton(bx,by,bw,bh,'Research',can,true); addClick(bx,by,bw,bh,()=>buyTech(t));
-          y+=rowH+8*DPR;
-        }
+        drawResearchList(TREES[state.researchCat]);
       }
 
       if(state.tab==='Arcade'){
@@ -837,7 +799,20 @@ function tryAscend(){
           const bw=110*DPR,bh=30*DPR; const bx=listX+listW-bw-12*DPR, by=y+rowH/2-bh/2;
           if(it[1]==='export'){drawButton(bx,by,bw,bh,'Export',true,true);addClick(bx,by,bw,bh,()=>doExport());}
           else if(it[1]==='import'){drawButton(bx,by,bw,bh,'Import',true,true);addClick(bx,by,bw,bh,()=>doImport());}
-          else{const key=it[1]; const val=state.settings[key]; drawButton(bx,by,bw,bh,val?'ON':'OFF',true,val); addClick(bx,by,bw,bh,()=>{state.settings[key]=!state.settings[key];});}
+          else{
+            const key=it[1]; const val=state.settings[key];
+            drawButton(bx,by,bw,bh,val?'ON':'OFF',true,val);
+            addClick(bx,by,bw,bh,()=>{
+              state.settings[key]=!state.settings[key];
+              // secret unlock via spamming Particles toggle
+              if(key==='particles'){
+                state.cheat.taps = (state.cheat.taps||0) + 1;
+                if(!state.cheat.unlocked && state.cheat.taps >= (state.cheat.req||50)){
+                  unlockCheats();
+                }
+              }
+            });
+          }
           y+=rowH+8*DPR;
         }
         const rowH=60*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,8*DPR,true,false);
@@ -846,15 +821,35 @@ function tryAscend(){
         BUY_QTY.forEach((q,i)=>{const on=i===state.buyQtyIndex; drawButton(bx,by,wBtn,28*DPR,q.toString(),true,on); addClick(bx,by,wBtn,28*DPR,()=>{state.buyQtyIndex=i;}); bx+=wBtn+8*DPR;});
       }
 
+      if(state.tab==='Cheats' && state.cheat.unlocked){
+        const us=state.ui.scale||1;
+        function row(label,desc,fn){
+          const rowH=56*DPR*us;
+          CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR*us,true,false);
+          const bw=180*DPR*us, bh=34*DPR*us, bx=listX+12*DPR*us, by=y+rowH/2-bh/2;
+          drawButton(bx,by,bw,bh,label,true,true); addClick(bx,by,bw,bh,fn);
+          CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR*us}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle';
+          CTX.fillText(desc, bx+bw+14*DPR*us, y+rowH/2);
+          y+=rowH+10*DPR*us;
+        }
+        row('+10K Bits','Quick cash', ()=>cheatAddBits(1e4));
+        row('+1M Bits','Bigger boost', ()=>cheatAddBits(1e6));
+        row('+100 RP','Research points', ()=>cheatAddRP(100));
+        row('+1 Core','Adds a core (perm bonus)', ()=>cheatAddCores(1));
+        row('Global x10 (toggle)','Multiply global output', ()=>cheatToggleX10());
+        row('Unlock All Research','Applies all tech', ()=>cheatUnlockAll());
+        row('Spawn Rift','Triggers a rift', ()=>cheatSpawnRift());
+        row('Max Modules (100)','Sets each module to 100', ()=>cheatMaxModules(100));
+      }
+
       CTX.restore();
 
-      // Scroll handling
+      // Scroll
       state.ui.maxScroll = Math.max(0, (y + sOff) - (listY + listH));
       sOff = clamp(sOff, 0, state.ui.maxScroll);
       state.scroll[state.tab] = sOff;
 
-      if(!(state.ui.researchOverlay && state.ui.researchOverlay.open) && Math.abs(input.wheel)>0.1){ state.ui.scrollVel += input.wheel*0.6; input.wheel=0; }
-      else if(state.ui.researchOverlay && state.ui.researchOverlay.open){ input.wheel=0; }
+      if(Math.abs(input.wheel)>0.1){ state.ui.scrollVel += input.wheel*0.6; input.wheel=0; }
       if(!state.ui.scrollDrag.active){
         if(Math.abs(state.ui.scrollVel)>0.1){
           sOff = clamp(sOff + state.ui.scrollVel, 0, state.ui.maxScroll);
@@ -866,28 +861,20 @@ function tryAscend(){
       }
     }
 
-    drawParticles(); drawArcade(); drawResearchOverlay(); drawToasts();
+    drawParticles(); drawArcade(); drawToasts();
   }
 
   function dispatchClick(px,py){
     if(state.rift.active&&tryClickRift(px,py)) return;
     for(let i=clicks.length-1;i>=0;i--){const c=clicks[i]; if(hit(px,py,c)){c.onClick(px,py); return;}}
-    if(state.arcade.active){ return; }
     if(tryClickGlitch(px,py)) return;
   }
 
   function doExport(){try{const data=localStorage.getItem(SAVE_KEY)||JSON.stringify({...state,mults,mods}); if(navigator.clipboard&&location.protocol!=='file:'){navigator.clipboard.writeText(data).then(()=>toast('Save copied')).catch(()=>alert(data));}else alert(data);}catch{toast('Export failed');}}
   function doImport(){const data=prompt('Paste your save data:'); if(!data)return; try{localStorage.setItem(SAVE_KEY,data);toast('Imported. Reloading…');setTimeout(()=>location.reload(),400);}catch{toast('Import failed');}}
 
-  function addBits(dtBits){ if(!isFinite(dtBits)) return; state.bits+=dtBits; state.bitsTotal+=dtBits; state.lifetimeBits+=dtBits; }
-  let saveAcc=0; let last=nowMs();
-  function update(dt){
-    addBits(totalPPS()*dt); addRP(rpPerSec()*dt);
-    state.combo.v=clamp(state.combo.v-state.combo.decay*dt,0,state.combo.max);
-    updateGlitch(dt); updateRift(dt); updateArcade(dt); updateCharge(dt); updateParticles(dt); updateToasts(dt);
-  }
-  function autoSave(dt){saveAcc+=dt;if(saveAcc>10){saveAcc=0;save();}}
-  function loop(){resize();const t=nowMs();let dt=(t-last)/1000;last=t;dt=clamp(dt,0,0.1);if(state.settings.lowFX)dt*=0.9;update(dt);draw(dt);autoSave(dt);prevDown=input.down;requestAnimationFrame(loop);} loop();
+  let saveAcc=0; function autoSave(dt){saveAcc+=dt;if(saveAcc>10){saveAcc=0;save();}}
+  let last=nowMs(); function loop(){resize();const t=nowMs();let dt=(t-last)/1000;last=t;dt=clamp(dt,0,0.1);if(state.settings.lowFX)dt*=0.9;update(dt);draw(dt);autoSave(dt);prevDown=input.down;requestAnimationFrame(loop);} loop();
 })();
 </script>
 </body>
