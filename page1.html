@@ -19,6 +19,7 @@
   const CANVAS=document.getElementById('game');
   const CTX=CANVAS.getContext('2d',{alpha:false});
   let DPR=Math.max(1,Math.min(3,(window.devicePixelRatio||1)));
+  let CLICK_EPS=6;
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const lerp=(a,b,t)=>a+(b-a)*t;
@@ -38,28 +39,19 @@
   window.addEventListener('resize',resize,{passive:true}); resize();
 
   const input={mx:0,my:0,down:false,wheel:0};
-  let CLICK_EPS=6; // in CSS px, scaled by DPR each frame
   let prevDown=false;
   function canvasPos(evt){const r=CANVAS.getBoundingClientRect();return {x:(evt.clientX-r.left)*DPR,y:(evt.clientY-r.top)*DPR};}
 
   function onPointerMove(e){
     const p=canvasPos(e); input.mx=p.x; input.my=p.y;
-
-    // Research overlay panning
-    if((state.ui.researchOverlay && state.ui.researchOverlay.open) && state.ui.researchOverlay.pan.active){
+    if(state.ui.researchOverlay && state.ui.researchOverlay.open && state.ui.researchOverlay.pan.active){
       const pan=state.ui.researchOverlay.pan;
-      const dx = input.mx - pan.lastX, dy = input.my - pan.lastY;
-      const moved2 = dx*dx + dy*dy;
-      const eps2 = (CLICK_EPS*DPR)*(CLICK_EPS*DPR);
-      if(moved2 > eps2){
-        state.ui.researchOverlay.camX += dx;
-        state.ui.researchOverlay.camY += dy;
-        pan.moved=true;
-      }
+      const dx=input.mx-pan.lastX, dy=input.my-pan.lastY;
+      const eps2=(CLICK_EPS*DPR)**2;
+      if(dx*dx+dy*dy>eps2){ state.ui.researchOverlay.camX+=dx; state.ui.researchOverlay.camY+=dy; pan.moved=true; }
       pan.lastX=input.mx; pan.lastY=input.my;
       return;
     }
-
     const dr=state.ui.scrollDrag;
     if(dr.active&&dr.tab===state.tab){
       const dy=input.my-dr.lastY; const max=state.ui.maxScroll||0;
@@ -69,13 +61,14 @@
   }
   function onPointerDown(e){
     const p=canvasPos(e); input.mx=p.x; input.my=p.y; input.down=true;
-
-    // If overlay open, begin panning and do not start sidebar drag
     if(state.ui.researchOverlay && state.ui.researchOverlay.open){
       state.ui.researchOverlay.pan={active:true,lastX:input.mx,lastY:input.my,moved:false};
       return;
     }
-
+    if(state.arcade.active && state.arcade.mode==='gate'){
+      gateStop();
+      return;
+    }
     const r=state.ui.sideRect;
     if(r && input.mx>=r.x && input.mx<=r.x+r.w && input.my>=r.y && input.my<=r.y+r.h){
       state.ui.scrollDrag={active:true,lastY:input.my,vy:0,tab:state.tab};
@@ -83,16 +76,12 @@
   }
   function onPointerUp(e){
     const p=canvasPos(e); input.mx=p.x; input.my=p.y; input.down=false;
-
     if(state.ui.researchOverlay && state.ui.researchOverlay.open){
-      const pan=state.ui.researchOverlay.pan||{moved:false,lastX:input.mx,lastY:input.my}; 
-      const wasMoved = !!pan.moved;
+      const pan=state.ui.researchOverlay.pan||{moved:false};
       state.ui.researchOverlay.pan={active:false,lastX:0,lastY:0,moved:false};
-      // Thresholded click
-      if(!wasMoved) dispatchClick(p.x,p.y);
+      if(!pan.moved) dispatchClick(p.x,p.y);
       return;
     }
-
     if(state.ui.scrollDrag.active){
       state.ui.scrollVel+=-state.ui.scrollDrag.vy*0.8;
       state.ui.scrollDrag={active:false,lastY:0,vy:0,tab:null};
@@ -118,9 +107,7 @@
       if(e.key==='Escape') endArcade();
       return;
     }
-    // Close overlay with Escape
     if(state.ui.researchOverlay && state.ui.researchOverlay.open && e.key==='Escape'){ state.ui.researchOverlay.open=false; return; }
-
     if(e.key==='e'||e.key==='E') doExport();
     if(e.key==='i'||e.key==='I') doImport();
     if(e.key==='p'||e.key==='P') tryAscend();
@@ -132,6 +119,7 @@
 
   let AC=null; function beep(f=420,d=0.05,v=0.02,type='triangle'){ if(state.settings.mute) return; try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(),g=AC.createGain(); o.type=type;o.frequency.value=f;g.gain.value=v;o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d);}catch{} }
 
+  // ===== SHOP =====
   const MODULES=[
     {id:0,name:'Nanite Swarm', base:20,   mult:1.15, prod:0.14},
     {id:1,name:'Signal Printer', base:130, mult:1.15, prod:1.1},
@@ -143,10 +131,21 @@
     {id:7,name:'Flux Shrine',   base:380000000,mult:1.15, prod:35000},
     {id:8,name:'Time Fork',     base:5500000000,mult:1.15, prod:210000},
     {id:9,name:'Singularity',   base:82000000000,mult:1.15, prod:1300000},
+    {id:10,name:'Quantum Loom',       base:1200000000000,mult:1.15, prod:8200000},
+    {id:11,name:'Quantum Institute',  base:18000000000000,mult:1.15, prod:54000000, rp:0.12},
+    {id:12,name:'Grav Well',          base:270000000000000,mult:1.15, prod:210000000},
+    {id:13,name:'Star Foundry',       base:4000000000000000,mult:1.15, prod:900000000},
+    {id:14,name:'Cosmic Lattice',     base:65000000000000000,mult:1.15, prod:3500000000},
+    {id:15,name:'Omega Array',        base:1000000000000000000,mult:1.15, prod:15000000000},
+    {id:16,name:'Neutrino Net',       base:1e21,mult:1.15, prod:6e10},
+    {id:17,name:'Axion Furnace',      base:1e23,mult:1.15, prod:2.4e11},
+    {id:18,name:'Quasar Loom',        base:2.5e24,mult:1.15, prod:1.1e12},
+    {id:19,name:'Dark-Matter Mill',   base:7.5e25,mult:1.15, prod:4.8e12},
+    {id:20,name:'Chrono Array',       base:2e27,mult:1.15, prod:2.1e13, rp:0.25}
   ];
 
   const state={
-    __version:3,
+    __version:9,
     bits:0,bitsTotal:0,lifetimeBits:0,
     rp:0,rpTotal:0,
     clickBase:1,clickMult:1,
@@ -168,45 +167,94 @@
     ui:{
       drawerOpen:false,scale:1,sideRect:null,maxScroll:0,
       scrollDrag:{active:false,lastY:0,vy:0,tab:null},scrollVel:0,
-      researchOverlay:{open:false,camX:0,camY:0,hover:null,pan:{active:false,lastX:0,lastY:0,moved:false}}
+      researchOverlay:{open:false,camX:0,camY:0,hover:null,pan:{active:false,lastX:0,lastY:0,moved:false},treeIndex:0}
     },
   };
 
   const mults={global:1,modules:1,glitch:1,combo:1};
-  const mods={clickCurve:1,rpGain:1,arcadeReward:1,riftHP:1,gateZone:1,pulseSize:1,pulseLife:1};
+  const mods={clickCurve:1,rpGain:1,arcadeReward:1,riftHP:1,gateZone:1,pulseSize:1,pulseLife:1,costMult:1,glitchRate:1,riftReward:1};
   const BUY_QTY=[1,10,100,'Max'];
 
-  const TECH=[
-    {id:'t_over1',  name:'Overclock I',     rp:50,  pre:[],              apply:()=>{mults.global*=1.1;}, pos:[0,0],   desc:'+10% global'},
-    {id:'t_curve',  name:'Harmonic Clicks', rp:25,  pre:[],              apply:()=>{mods.clickCurve*=1.5;}, pos:[-1,1], desc:'Pulses hit harder'},
-    {id:'t_glitch', name:'Glitch Magnet',   rp:80,  pre:['t_over1'],     apply:()=>{mults.glitch*=1.5;}, pos:[1,1],   desc:'+50% Glitch Orbs'},
-    {id:'t_combo',  name:'Flux Combo',      rp:150, pre:['t_curve'],     apply:()=>{state.combo.max=0.8; state.combo.decay=0.09;}, pos:[-1,2], desc:'Higher combo cap'},
-    {id:'t_over2',  name:'Overclock II',    rp:200, pre:['t_over1'],     apply:()=>{mults.global*=1.2;}, pos:[0,2],   desc:'+20% global'},
-    {id:'t_lab',    name:'Lab Protocols',   rp:120, pre:['t_over1'],     apply:()=>{mods.rpGain*=1.6;}, pos:[1,2],    desc:'+60% RP gain'},
-    {id:'t_corecrit',name:'Widen Crit',     rp:200, pre:['t_curve'],     apply:()=>{state.critZone.lo=Math.max(0,state.critZone.lo-0.05); state.critZone.hi=Math.min(1,state.critZone.hi+0.02);}, pos:[-1,3], desc:'Wider crit arc'},
-    {id:'t_over3',  name:'Overclock III',   rp:450, pre:['t_over2'],     apply:()=>{mults.global*=1.25;}, pos:[0,3],  desc:'+25% global'},
-    {id:'t_riftdmp',name:'Rift Dampers',    rp:300, pre:['t_lab'],       apply:()=>{mods.riftHP*=0.8;}, pos:[1,3],    desc:'Rifts easier'},
-    {id:'t_arcade', name:'Arcade Grants',   rp:260, pre:['t_lab'],       apply:()=>{mods.arcadeReward*=1.3;}, pos:[2,3], desc:'+30% arcade rewards'},
-    {id:'t_combo2', name:'Combo Sustain',   rp:420, pre:['t_combo'],     apply:()=>{state.combo.decay=Math.max(0.05,state.combo.decay*0.7);}, pos:[-1,4], desc:'Slower combo decay'},
-    {id:'t_mods',   name:'Module Eff.',     rp:600, pre:['t_over3'],     apply:()=>{mults.modules*=1.2;}, pos:[0,4],  desc:'+20% modules'},
-    {id:'t_gate',   name:'Gate Precision',  rp:220, pre:['t_curve'],     apply:()=>{mods.gateZone*=1.25;}, pos:[-2,3], desc:'Easier Timing Gate'},
-    {id:'t_pulse',  name:'Pulse Tuning',    rp:180, pre:['t_curve'],     apply:()=>{mods.pulseSize*=1.15; mods.pulseLife*=1.2;}, pos:[-2,2], desc:'Bigger, longer Pulse Rush'},
+  // ===== RESEARCH TREES (linear; separate categories) =====
+  const TREES=[
+    {name:'Core', id:'core', items:[
+      {id:'t_over1',  tier:0, rp:50,  pre:[],              name:'Overclock I',     desc:'+10% global',  apply:()=>{mults.global*=1.10;}},
+      {id:'t_curve',  tier:1, rp:25,  pre:['t_over1'],     name:'Harmonic Clicks', desc:'Pulses hit harder', apply:()=>{mods.clickCurve*=1.5;}},
+      {id:'t_glitch', tier:1, rp:80,  pre:['t_over1'],     name:'Glitch Magnet',   desc:'+50% Glitch orbs', apply:()=>{mults.glitch*=1.5;}},
+      {id:'t_combo',  tier:2, rp:150, pre:['t_curve'],     name:'Flux Combo',      desc:'Higher combo cap', apply:()=>{state.combo.max=0.8; state.combo.decay=0.09;}},
+      {id:'t_corecrit',tier:2,rp:200, pre:['t_curve'],     name:'Widen Crit',      desc:'Wider crit arc', apply:()=>{state.critZone.lo=Math.max(0,state.critZone.lo-0.05); state.critZone.hi=Math.min(1,state.critZone.hi+0.02);}},
+      {id:'t_over2',  tier:3, rp:200, pre:['t_over1'],     name:'Overclock II',    desc:'+20% global', apply:()=>{mults.global*=1.20;}},
+      {id:'t_click2', tier:3, rp:500, pre:['t_curve'],     name:'Pulse Overdrive', desc:'+50% click payout', apply:()=>{state.clickMult*=1.5;}},
+      {id:'t_over3',  tier:4, rp:450, pre:['t_over2'],     name:'Overclock III',   desc:'+25% global', apply:()=>{mults.global*=1.25;}},
+      {id:'t_charge1',tier:4, rp:680, pre:['t_over2'],     name:'Charge Tuning I', desc:'Charge fills faster', apply:()=>{state.charge.tMax=Math.max(1.2,state.charge.tMax*0.92);}},
+      {id:'t_crit2',  tier:4, rp:700, pre:['t_corecrit'],  name:'Critical Expansion', desc:'Even wider crit arc', apply:()=>{state.critZone.lo=Math.max(0,state.critZone.lo-0.03); state.critZone.hi=Math.min(1,state.critZone.hi+0.02);}},
+      {id:'t_over4',  tier:5, rp:950, pre:['t_over3'],     name:'Overclock IV',    desc:'+30% global', apply:()=>{mults.global*=1.30;}},
+      {id:'t_click3', tier:5, rp:1400,pre:['t_click2'],    name:'Pulse Overdrive II', desc:'+75% click payout', apply:()=>{state.clickMult*=1.75;}},
+      {id:'t_charge2',tier:5, rp:1200,pre:['t_charge1'],   name:'Charge Tuning II', desc:'Charge fills much faster', apply:()=>{state.charge.tMax=Math.max(1.1,state.charge.tMax*0.88);}}
+    ]},
+    {name:'Labs', id:'labs', items:[
+      {id:'t_lab',    tier:0, rp:120, pre:[],              name:'Lab Protocols',   desc:'+60% RP gain', apply:()=>{mods.rpGain*=1.6;}},
+      {id:'t_riftdmp',tier:1, rp:300, pre:['t_lab'],       name:'Rift Dampers',    desc:'Rifts easier',  apply:()=>{mods.riftHP*=0.8;}},
+      {id:'t_lab2',   tier:2, rp:700, pre:['t_lab'],       name:'Institute Grants',desc:'+50% RP gain', apply:()=>{mods.rpGain*=1.5;}},
+      {id:'t_rift2',  tier:3, rp:900, pre:['t_riftdmp'],   name:'Rift Shunts',     desc:'Rifts even easier', apply:()=>{mods.riftHP*=0.85;}},
+      {id:'t_mods',   tier:4, rp:600, pre:['t_lab2'],      name:'Module Eff.',     desc:'+20% modules', apply:()=>{mults.modules*=1.2;}},
+      {id:'t_lab3',   tier:4, rp:1200,pre:['t_lab2'],      name:'Grand Fellowship',desc:'+45% RP gain', apply:()=>{mods.rpGain*=1.45;}},
+      {id:'t_cost1',  tier:5, rp:900, pre:['t_mods'],      name:'Bulk Procurement',desc:'Shop costs -5%', apply:()=>{mods.costMult*=0.95;}},
+      {id:'t_cost2',  tier:6, rp:1500,pre:['t_cost1'],     name:'Megascale Contracts',desc:'Shop costs -8%', apply:()=>{mods.costMult*=0.92;}},
+      {id:'t_rift3',  tier:6, rp:1400,pre:['t_rift2'],     name:'Rift Nullifiers', desc:'Rifts trivialized', apply:()=>{mods.riftHP*=0.85;}},
+      {id:'t_riftrew',tier:6, rp:1300,pre:['t_rift2'],     name:'Rift Dividends',  desc:'+40% Rift rewards', apply:()=>{mods.riftReward*=1.4;}},
+      {id:'t_glitchrate',tier:3,rp:700,pre:['t_lab'],      name:'Glitch Beacon',   desc:'More Glitch spawns', apply:()=>{mods.glitchRate*=1.35;}}
+    ]},
+    {name:'Arcade', id:'arcade', items:[
+      {id:'t_gate',   tier:0, rp:220, pre:[],              name:'Gate Precision',  desc:'Easier Timing Gate', apply:()=>{mods.gateZone*=1.25;}},
+      {id:'t_pulse',  tier:0, rp:180, pre:[],              name:'Pulse Tuning',    desc:'Bigger/longer Pulse Rush', apply:()=>{mods.pulseSize*=1.15; mods.pulseLife*=1.2;}},
+      {id:'t_arcade', tier:1, rp:260, pre:['t_pulse'],     name:'Arcade Grants',   desc:'+30% arcade rewards', apply:()=>{mods.arcadeReward*=1.3;}},
+      {id:'t_arcade2',tier:2, rp:520, pre:['t_arcade'],    name:'Arcade Stipend',  desc:'+25% arcade rewards', apply:()=>{mods.arcadeReward*=1.25;}},
+      {id:'t_pulse2', tier:3, rp:600, pre:['t_pulse'],     name:'Pulse Tuning II', desc:'Even bigger/longer', apply:()=>{mods.pulseSize*=1.2; mods.pulseLife*=1.2;}},
+      {id:'t_gate2',  tier:3, rp:620, pre:['t_gate'],      name:'Gate Precision II',desc:'Much easier Gate', apply:()=>{mods.gateZone*=1.2;}},
+      {id:'t_arcade3',tier:4, rp:820, pre:['t_arcade2'],   name:'Arcade Endowment',desc:'+25% arcade rewards', apply:()=>{mods.arcadeReward*=1.25;}},
+      {id:'t_arcade4',tier:5, rp:1200,pre:['t_arcade3'],   name:'Arcade Jackpot',  desc:'+25% arcade rewards', apply:()=>{mods.arcadeReward*=1.25;}}
+    ]},
+    {name:'Quantum', id:'quantum', items:[
+      {id:'t_combo2', tier:1, rp:420, pre:[],              name:'Combo Sustain',   desc:'Slower combo decay', apply:()=>{state.combo.decay=Math.max(0.05,state.combo.decay*0.7);}},
+      {id:'t_time',   tier:2, rp:700, pre:['t_combo2'],    name:'Time Compression',desc:'Charge faster', apply:()=>{state.charge.tMax=Math.max(1.2,state.charge.tMax*0.9);}},
+      {id:'t_glob',   tier:3, rp:1400,pre:['t_time'],      name:'Planck Shift',    desc:'+15% global', apply:()=>{mults.global*=1.15;}},
+      {id:'t_combo3', tier:4, rp:1600,pre:['t_combo2'],    name:'Combo Lock',      desc:'Higher combo cap', apply:()=>{state.combo.max=1.0;}},
+      {id:'t_glob2',  tier:5, rp:2100,pre:['t_glob'],      name:'Vacuum Symmetry', desc:'+20% global', apply:()=>{mults.global*=1.20;}},
+      {id:'t_qtime2', tier:5, rp:1800,pre:['t_time'],      name:'Temporal Folding',desc:'Charge even faster', apply:()=>{state.charge.tMax=Math.max(1.0,state.charge.tMax*0.85);}},
+      {id:'t_combo4', tier:6, rp:2400,pre:['t_combo3'],    name:'Combo Anchor',    desc:'Cap + decay ↓', apply:()=>{state.combo.max=1.2; state.combo.decay=Math.max(0.04,state.combo.decay*0.75);}}
+    ]},
+    {name:'Economy', id:'economy', items:[
+      {id:'e_bulk', tier:0, rp:180, pre:[], name:'Bulk Logistics', desc:'Module output +10%', apply:()=>{mults.modules*=1.10;}},
+      {id:'e_vendor', tier:1, rp:350, pre:['e_bulk'], name:'Vendor Network', desc:'Shop costs -6%', apply:()=>{mods.costMult=(mods.costMult||1)*0.94;}},
+      {id:'e_synergy', tier:2, rp:520, pre:['e_bulk'], name:'Synergy Matrices', desc:'Module output +15%', apply:()=>{mults.modules*=1.15;}},
+      {id:'e_broker', tier:3, rp:850, pre:['e_vendor'], name:'Dimensional Brokers', desc:'Shop costs -8%', apply:()=>{mods.costMult=(mods.costMult||1)*0.92;}},
+      {id:'e_overdrive', tier:3, rp:900, pre:['e_synergy'], name:'Overdrive Plants', desc:'+10% global', apply:()=>{mults.global*=1.10;}},
+      {id:'e_network', tier:4, rp:1200, pre:['e_broker'], name:'Parallel Supply', desc:'Module output +20%', apply:()=>{mults.modules*=1.20;}}
+    ]},
+    {name:'Defense', id:'defense', items:[
+      {id:'d_warn', tier:0, rp:200, pre:[], name:'Beam Early Warning', desc:'Safer lasers in Meteor', apply:()=>{mods.beamWarn=(mods.beamWarn||1)*1.25;}},
+      {id:'d_cushion', tier:1, rp:300, pre:['d_warn'], name:'Kinetic Cushion', desc:'Arcade penalties -20%', apply:()=>{mods.damageShield=(mods.damageShield||1)*0.8;}},
+      {id:'d_observer', tier:2, rp:520, pre:['d_warn'], name:'Trajectory Observer', desc:'Gate leniency +10%', apply:()=>{mods.gateZone*=1.10;}},
+      {id:'d_reflect', tier:3, rp:900, pre:['d_cushion'], name:'Reflective Mesh', desc:'+10% global', apply:()=>{mults.global*=1.10;}}
+    ]}
   ];
 
-
+  // Flatten TECH for logic
+  const TECH = TREES.flatMap(tr => tr.items.map(it => ({...it, tree: tr.id})));
+  const SAVE_KEY=('quantum_forge_linear_categories@'+(location.host||'local'));
   function ensureDefaults(){
-    // Make sure new UI keys exist even if an old save overwrote state.ui.
     state.ui = state.ui || {drawerOpen:false,scale:1,sideRect:null,maxScroll:0,scrollDrag:{active:false,lastY:0,vy:0,tab:null},scrollVel:0};
-    if(!state.ui.researchOverlay){
-      state.ui.researchOverlay = {open:false,camX:0,camY:0,hover:null,pan:{active:false,lastX:0,lastY:0,moved:false}};
-    }
+    if(!state.ui.researchOverlay){ state.ui.researchOverlay={open:false,camX:0,camY:0,hover:null,pan:{active:false,lastX:0,lastY:0,moved:false},treeIndex:0}; }
+    const byId={}; (state.modules||[]).forEach(m=>{byId[m.id]=m;});
+    state.modules = MODULES.map(m => byId[m.id] ? {id:m.id,count:byId[m.id].count||0} : {id:m.id,count:0});
   }
-
-  const SAVE_KEY=('quantum_forge_v3@'+(location.host||'local'));
   function save(){state.lastSave=Date.now();const data={...state,mults,mods};try{localStorage.setItem(SAVE_KEY,JSON.stringify(data));}catch{}}
   function load(){
     try{
-      const raw=localStorage.getItem(SAVE_KEY); if(!raw) return; const d=JSON.parse(raw);
+      let raw=localStorage.getItem(SAVE_KEY);
+      if(!raw) { ensureDefaults(); return; }
+      const d=JSON.parse(raw);
       const keep=['bits','bitsTotal','lifetimeBits','rp','rpTotal','clickBase','clickMult','charge','critZone','combo','modules','upgrades','tech','achievements','ascend','settings','lastSave','tab','buyQtyIndex','scroll','glitch','rift','particles','toast','arcade','clickArea','ui'];
       for(const k of keep){ if(k in d) state[k]=d[k]; }
       if(d.mults) Object.assign(mults,d.mults);
@@ -214,17 +262,23 @@
       ensureDefaults();
       const secs=clamp((Date.now()-(d.lastSave||Date.now()))/1000,0,3600*8);
       const pps=totalPPS(); const off=pps*secs*0.75; if(off>0){ addBits(off); toast(`Offline +${fmt(off)} bits`); }
-    }catch{}
+    }catch{ ensureDefaults(); }
   }
-  load(); ensureDefaults();
+  load();
   document.addEventListener('visibilitychange',()=>{if(document.hidden)save();},{passive:true});
   window.addEventListener('beforeunload',()=>{try{save();}catch{}});
 
   function count(id){return state.modules[id]?.count||0;}
-  function moduleCost(id,n){const m=MODULES[id],c=count(id); if(n===1) return m.base*(m.mult**c); const r=m.mult; const base=m.base*(r**c); return base*((r**n-1)/(r-1));}
+  function moduleCost(id,n){
+    const m=MODULES[id],c=count(m.id); 
+    const r=m.mult;
+    const base=(m.base*mods.costMult)*(r**c);
+    if(n===1) return base;
+    return base*((r**n-1)/(r-1));
+  }
   function moduleProd(id){const m=MODULES[id]; return (m.prod||0)*mults.modules*mults.global*(1+state.ascend.cores*0.1);}
   function totalPPS(){let v=0;for(const m of MODULES){v+=count(m.id)*moduleProd(m.id);}return v*(1+state.combo.v);}
-  function rpPerSec(){const lab=MODULES[6];const base=(lab.rp||0)*count(6);return base*mods.rpGain;}
+  function rpPerSec(){ let rpv=0; for(const m of MODULES){ if(m.rp){ rpv += (m.rp||0)*count(m.id); } } return rpv*mods.rpGain; }
 
   function clickValueFromCharge(){
     const q=state.charge.t/state.charge.tMax; const curve=(q*q)*mods.clickCurve;
@@ -232,7 +286,15 @@
   }
 
   function canAfford(x){return state.bits>=x;}
-  function maxAffordable(id){const m=MODULES[id];const r=m.mult;const c=count(id);const base=m.base*(r**c); if(state.bits<base) return 0; const A=state.bits*(r-1)/base+1; const n=Math.floor(Math.log(A)/Math.log(r)); return Math.max(0,n);}
+  function maxAffordable(id){
+    const m=MODULES[id];
+    const r=m.mult;const c=count(id);
+    const base=(m.base*mods.costMult)*(r**c); 
+    if(state.bits<base) return 0; 
+    const A=state.bits*(r-1)/base+1; 
+    const n=Math.floor(Math.log(A)/Math.log(r)); 
+    return Math.max(0,n);
+  }
   function buyModule(id){const qty=BUY_QTY[state.buyQtyIndex]; let n=qty==='Max'?maxAffordable(id):qty; if(n<=0)return; const cost=moduleCost(id,n); if(!canAfford(cost))return; state.bits-=cost; state.modules[id].count+=n; beep(220+id*30,0.02,0.02);}
   function cycleBuyQty(d){state.buyQtyIndex=(state.buyQtyIndex+d+BUY_QTY.length)%BUY_QTY.length; toast(`Buy: ${BUY_QTY[state.buyQtyIndex]}`);}
 
@@ -240,6 +302,7 @@
   function addRP(v){if(!isFinite(v))return; state.rp+=v; state.rpTotal+=v;}
 
   function hasTech(id){return state.tech.includes(id);}
+  function techById(id){return TECH.find(t=>t.id===id);}
   function techAvailable(t){return !hasTech(t.id)&&t.pre.every(p=>hasTech(p));}
   function buyTech(t){if(!techAvailable(t)||state.rp<t.rp)return; state.rp-=t.rp; state.tech.push(t.id); t.apply(); toast(`Researched: ${t.name}`); beep(760,0.05,0.03);}
 
@@ -254,7 +317,7 @@
   function updateGlitch(dt){
     const g=state.glitch;
     if(g.active){g.life-=dt; if(g.life<=0)g.active=false;}
-    else{ g.next-=dt; if(g.next<=0){ g.active=true; g.life=10; g.x=rand(100,CANVAS.width-100); g.y=rand(120,CANVAS.height-160); g.value=(totalPPS()*rand(8,24)+clickValueFromCharge()*rand(20,60))*mults.glitch; g.next=rand(32,68);} }
+    else{ g.next-=dt; if(g.next<=0){ g.active=true; g.life=10; g.x=rand(100,CANVAS.width-100); g.y=rand(120,CANVAS.height-160); g.value=(totalPPS()*rand(8,24)+clickValueFromCharge()*rand(20,60))*mults.glitch; g.next=rand(32,68)/mods.glitchRate;} }
   }
   function tryClickGlitch(px,py){
     const g=state.glitch; if(!g.active) return false;
@@ -277,8 +340,8 @@
         r.active=true;r.open=0;r.closing=false;r.wobble=0;
         const pps=Math.max(1,totalPPS());
         r.hpMax=pps*rand(40,70)*mods.riftHP; r.hp=r.hpMax;
-        r.bitsReward=pps*rand(80,160);
-        r.rpReward=Math.max(5,pps*0.02*rand(20,40));
+        r.bitsReward=pps*rand(80,160)*mods.riftReward;
+        r.rpReward=Math.max(5,pps*0.02*rand(20,40))*mods.riftReward;
         r.prize=Math.random()<0.5?'bits':'rp';
         r.ttl=30; r.stars.length=0; for(let i=0;i<80;i++) r.stars.push({x:Math.random(),y:Math.random(),a:rand(0.5,1)});
         toast('A Rift tears reality! Spam click to seal it!');
@@ -353,7 +416,7 @@
     if(!input.down){state.charge.active=false;}
   }
 
-  // Arcade
+  // ===== Arcade (kept: pulse, gate, meteor) =====
   function startPulseRush(){
     state.arcade.active=true; state.arcade.mode='pulse'; state.arcade.t=25; state.arcade.score=0; state.arcade.pulses=[];
     state.arcade.pulse={spawn:0.65,life:2.4*mods.pulseLife,rMin:22*mods.pulseSize,rMax:42*mods.pulseSize,maxOnScreen:8};
@@ -365,35 +428,24 @@
   }
   function startMeteor(){
     state.arcade.active=true; state.arcade.mode='meteor'; state.arcade.t=28; state.arcade.score=0;
-    // Hazards: rocks, comets (tamed), mines->shards, sweeping beams
     const speed=300*DPR;
     state.arcade.meteor={
       px:CANVAS.width/2, py:CANVAS.height*0.65, r:14*DPR,
       rocks:[], comets:[], mines:[], shards:[], beams:[], stars:[],
-      spawn:{rock:7.5, comet:1.2, mine:1.4, beam:0.55, star:0.55},
+      spawn:{rock:7.5, comet:1.0, mine:1.2, beam:0.45, star:0.55},
       speed
     };
-    toast('Meteor Dodge+: full send.');
-  }
-  function endArcade(){
-    if(!state.arcade.active) return;
-    const s=Math.max(0,Math.floor(state.arcade.score)); const mode=state.arcade.mode; state.arcade.active=false;
-    let bits=0,rp=0;
-    if(mode==='pulse'){bits=s*3;rp=s*0.3;}
-    else if(mode==='gate'){bits=s*8;rp=s*0.6;}
-    else if(mode==='meteor'){bits=s*6;rp=s*0.45;}
-    bits*=mods.arcadeReward; rp*=mods.arcadeReward;
-    if(bits||rp){addBits(bits);addRP(rp);toast(`Arcade reward: +${fmt(bits)} bits, +${fmt(rp)} RP`);}
+    toast('Meteor Dodge+: dodge meteors, shards & lasers.');
   }
 
   function spawnBeam(M){
     const horizontal=Math.random()<0.5;
     if(horizontal){
       const y=rand(120*DPR, CANVAS.height-120*DPR);
-      M.beams.push({dir:'h',pos:y,phase:'warn',t:0.75,fire:1.10,th:28*DPR});
+      M.beams.push({dir:'h',pos:y,phase:'warn',t:0.75,fire:1.00,th:26*DPR});
     }else{
       const x=rand(80*DPR, CANVAS.width-80*DPR);
-      M.beams.push({dir:'v',pos:x,phase:'warn',t:0.75,fire:1.10,th:28*DPR});
+      M.beams.push({dir:'v',pos:x,phase:'warn',t:0.75,fire:1.00,th:26*DPR});
     }
   }
 
@@ -410,85 +462,30 @@
 
     }else if(A.mode==='meteor'){
       const M=A.meteor; M.px=input.mx; M.py=input.my; A.score+=dt*3.0;
-
-      // Spawns
       if(Math.random()<dt*M.spawn.rock) M.rocks.push({x:rand(30,CANVAS.width-30),y:-30*DPR,r:rand(22,52)*DPR,vy:rand(1.2,1.8)*M.speed});
       if(Math.random()<dt*M.spawn.comet){
-        const side=Math.floor(rand(0,4)); // 0 top,1 left,2 right,3 top offset
-        let x=rand(20,CANVAS.width-20), y=-40*DPR, vx=0, vy=rand(1.05,1.45)*M.speed;
-        if(side===1){ x=-40*DPR; y=rand(60,CANVAS.height*0.6); vx=rand(0.75,1.0)*M.speed; vy=rand(0.25,0.6)*M.speed; }
-        if(side===2){ x=CANVAS.width+40*DPR; y=rand(60,CANVAS.height*0.6); vx=-rand(0.75,1.0)*M.speed; vy=rand(0.25,0.6)*M.speed; }
-        M.comets.push({x,y,r:rand(16,26)*DPR,vx,vy,homing:0.008,drift:rand(-0.35,0.35)});
+        const x=rand(20,CANVAS.width-20), y=-40*DPR, vx=0, vy=rand(1.05,1.35)*M.speed;
+        M.comets.push({x,y,r:rand(16,26)*DPR,vx,vy,homing:0.006,drift:rand(-0.3,0.3)});
       }
-      if(Math.random()<dt*M.spawn.mine) M.mines.push({x:rand(40,CANVAS.width-40),y:-20*DPR,r:16*DPR,vy:rand(0.8,1.1)*M.speed,t:2.4}); // fuse
+      if(Math.random()<dt*M.spawn.mine) M.mines.push({x:rand(40,CANVAS.width-40),y:-20*DPR,r:16*DPR,vy:rand(0.8,1.1)*M.speed,t:2.4});
       if(Math.random()<dt*M.spawn.beam) spawnBeam(M);
       if(Math.random()<dt*M.spawn.star) M.stars.push({x:rand(40,CANVAS.width-40),y:-10*DPR,r:8*DPR,vy:rand(0.9,1.2)*M.speed});
 
-      // Update rocks
       for(let i=M.rocks.length-1;i>=0;i--){const k=M.rocks[i];k.y+=k.vy*dt;if(k.y>CANVAS.height+80*DPR)M.rocks.splice(i,1);}
-
-      // Update comets (gentle homing + drift wobble)
-      for(let i=M.comets.length-1;i>=0;i--){
-        const c=M.comets[i];
-        const ang=Math.atan2(M.py-c.y, M.px-c.x) + c.drift*0.15*Math.sin(performance.now()/600 + i);
-        const sp=Math.hypot(c.vx,c.vy)||M.speed*0.9;
-        const tx=Math.cos(ang)*sp, ty=Math.sin(ang)*sp;
-        c.vx=lerp(c.vx,tx,c.homing);  // tiny adjustment
-        c.vy=lerp(c.vy,ty,c.homing);
-        c.x+=c.vx*dt; c.y+=c.vy*dt;
-        if(c.x<-120*DPR||c.x>CANVAS.width+120*DPR||c.y>CANVAS.height+120*DPR) M.comets.splice(i,1);
-      }
-
-      // Update mines -> explode into shards
-      for(let i=M.mines.length-1;i>=0;i--){
-        const m=M.mines[i]; m.y+=m.vy*dt; m.t-=dt;
-        if(m.t<=0 || m.y>CANVAS.height-40*DPR){
-          // explode
-          const N=10; const speed=rand(220,320)*DPR;
-          for(let j=0;j<N;j++){const a=(Math.PI*2)*j/N + rand(-0.2,0.2); M.shards.push({x:m.x,y:m.y,r:6*DPR,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,life:1.6});}
-          particleBurst(m.x,m.y,12,'#ffcf88'); M.mines.splice(i,1); beep(520,0.05,0.03,'square');
-        } else if(m.y>CANVAS.height+40*DPR){ M.mines.splice(i,1); }
-      }
-      for(let i=M.shards.length-1;i>=0;i--){
-        const s=M.shards[i]; s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=dt;
-        if(s.x<-60*DPR||s.x>CANVAS.width+60*DPR||s.y<-60*DPR||s.y>CANVAS.height+60*DPR||s.life<=0) M.shards.splice(i,1);
-      }
-
-      // Update beams
-      for(let i=M.beams.length-1;i>=0;i--){
-        const b=M.beams[i];
-        b.t-=dt;
-        if(b.phase==='warn' && b.t<=0){ b.phase='fire'; b.t=b.fire; }
-        else if(b.phase==='fire' && b.t<=0){ M.beams.splice(i,1); }
-      }
-
-      // Update stars
+      for(let i=M.comets.length-1;i>=0;i--){const c=M.comets[i]; c.x+=c.vx*dt; c.y+=c.vy*dt; if(c.y>CANVAS.height+120*DPR) M.comets.splice(i,1);}
+      for(let i=M.mines.length-1;i>=0;i--){const m=M.mines[i]; m.y+=m.vy*dt; m.t-=dt; if(m.t<=0||m.y>CANVAS.height-40*DPR){ const N=10; const sp=rand(220,320)*DPR; for(let j=0;j<N;j++){const a=(Math.PI*2)*j/N + rand(-0.2,0.2); M.shards.push({x:m.x,y:m.y,r:6*DPR,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1.6});} particleBurst(m.x,m.y,12,'#ffcf88'); M.mines.splice(i,1); beep(520,0.05,0.03,'square'); } }
+      for(let i=M.shards.length-1;i>=0;i--){const s=M.shards[i]; s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=dt; if(s.life<=0) M.shards.splice(i,1);}
+      for(let i=M.beams.length-1;i>=0;i--){const b=M.beams[i]; b.t-=dt; if(b.phase==='warn'&&b.t<=0){b.phase='fire'; b.t=b.fire;} else if(b.phase==='fire'&&b.t<=0){M.beams.splice(i,1);}}
       for(let i=M.stars.length-1;i>=0;i--){const k=M.stars[i];k.y+=k.vy*dt;if(k.y>CANVAS.height+30*DPR)M.stars.splice(i,1);}
-
-      // Collisions
-      const pr=M.r;
-      function hitCircle(cx,cy,cr){const d2=(cx-M.px)**2+(cy-M.py)**2; return d2<=(cr+pr)**2; }
+      const pr=M.r; function hitCircle(cx,cy,cr){const d2=(cx-M.px)**2+(cy-M.py)**2; return d2<=(cr+pr)**2; }
       function penalize(amount=3){ A.score=Math.max(0,A.score-amount); beep(260,0.04,0.03,'sine'); particleBurst(M.px,M.py,8,'#ff9aa2'); }
-
       for(let i=M.rocks.length-1;i>=0;i--){const k=M.rocks[i]; if(hitCircle(k.x,k.y,k.r)){ penalize(3); M.rocks.splice(i,1);}}
       for(let i=M.comets.length-1;i>=0;i--){const k=M.comets[i]; if(hitCircle(k.x,k.y,k.r)){ penalize(3); M.comets.splice(i,1);}}
-      for(let i=M.mines.length-1;i>=0;i--){const k=M.mines[i]; if(hitCircle(k.x,k.y,k.r*1.1)){ penalize(4); k.t=0; /* force explode next loop */ }}
+      for(let i=M.mines.length-1;i>=0;i--){const k=M.mines[i]; if(hitCircle(k.x,k.y,k.r*1.1)){ penalize(4); k.t=0; }}
       for(let i=M.shards.length-1;i>=0;i--){const k=M.shards[i]; if(hitCircle(k.x,k.y,k.r)){ penalize(2.5); M.shards.splice(i,1);}}
-
-      // Beam collision
-      for(const b of M.beams){
-        if(b.phase!=='fire') continue;
-        if(b.dir==='h'){
-          const y=b.pos, half=b.th/2;
-          if(M.py>y-half && M.py<y+half){ penalize(6); }
-        }else{
-          const x=b.pos, half=b.th/2;
-          if(M.px>x-half && M.px<x+half){ penalize(6); }
-        }
-      }
-
-      // Star collect
+      for(const b of M.beams){ if(b.phase!=='fire') continue; if(b.dir==='h'){ const y=b.pos, half=b.th/2; if(M.py>y-half && M.py<y+half){ penalize(6); } } else { const x=b.pos, half=b.th/2; if(M.px>x-half && M.px<x+half){ penalize(6); } } }
       for(let i=M.stars.length-1;i>=0;i--){const k=M.stars[i]; if(hitCircle(k.x,k.y,k.r)){ A.score+=3; addRP(0.5*mods.rpGain); beep(900,0.03,0.02,'triangle'); particleBurst(k.x,k.y,6,'#a7f3d0'); M.stars.splice(i,1);}}
+
     }
   }
 
@@ -496,20 +493,21 @@
     if(!state.arcade.active) return;
     const A=state.arcade;
     CTX.globalAlpha=0.85;CTX.fillStyle='#000';CTX.fillRect(0,0,CANVAS.width,CANVAS.height);CTX.globalAlpha=1;
-    const title=A.mode==='pulse'?'Pulse Rush':A.mode==='gate'?'Timing Gate':A.mode==='meteor'?'Meteor Dodge+':'Arcade';
-    CTX.fillStyle='#e6eef6';CTX.font=`800 ${18*DPR}px Inter`;CTX.textAlign='center';CTX.fillText(`${title} — ${A.t.toFixed(1)}s`,CANVAS.width/2,60*DPR);
+    const modeTitle={pulse:'Pulse Rush',gate:'Timing Gate',meteor:'Meteor Dodge+'}[A.mode]||'Arcade';
+    CTX.fillStyle='#e6eef6';CTX.font=`800 ${18*DPR}px Inter`;CTX.textAlign='center';CTX.fillText(`${modeTitle} — ${A.t.toFixed(1)}s`,CANVAS.width/2,60*DPR);
+
     if(A.mode==='pulse'){
       const conf=A.pulse; for(const p of A.pulses){const t=p.life/p.max; const r=lerp(conf.rMin*DPR,conf.rMax*DPR,t); CTX.globalAlpha=Math.max(0.2,t); CTX.fillStyle='#8be9fd'; CTX.beginPath(); CTX.arc(p.x,p.y,r,0,Math.PI*2); CTX.fill(); CTX.globalAlpha=1;}
       CTX.fillStyle='#9fb0c6';CTX.font=`700 ${14*DPR}px Inter`;CTX.fillText(`Score: ${Math.floor(A.score)}`,CANVAS.width/2,90*DPR);
+
     }else if(A.mode==='gate'){
       const cx=CANVAS.width/2,y=CANVAS.height/2,W=520*DPR,H=22*DPR; CTX.fillStyle='#121821'; roundRect(cx-W/2,y-H/2,W,H,10*DPR,true,false);
       const [zl,zh]=A.gate.zone; CTX.fillStyle='#284b63'; roundRect(cx-W/2+W*zl,y-H/2,W*(zh-zl),H,10*DPR,true,false);
       const mx=cx-W/2+W*A.gate.x; CTX.fillStyle='#e6eef6'; roundRect(mx-5*DPR,y-10*DPR,10*DPR,20*DPR,3*DPR,true,false);
       CTX.fillStyle='#9fb0c6';CTX.font=`700 ${14*DPR}px Inter`; CTX.fillText(`Tries: ${A.gate.tries}  Score: ${A.score}`,cx,y+40*DPR); CTX.fillText(`Press Space OR Click the bar`,cx,y+62*DPR);
+
     }else if(A.mode==='meteor'){
       const M=A.meteor;
-
-      // Beams
       for(const b of M.beams){
         if(b.phase==='warn'){
           CTX.globalAlpha=0.5+0.5*Math.sin(performance.now()/120);
@@ -525,99 +523,95 @@
           CTX.globalAlpha=1;
         }
       }
-
-      // Rocks
       for(const k of M.rocks){CTX.fillStyle='#394553';CTX.beginPath();CTX.arc(k.x,k.y,k.r,0,Math.PI*2);CTX.fill();}
-      // Comets
-      for(const c of M.comets){
-        CTX.fillStyle='#b8d7ff';
-        CTX.beginPath();CTX.arc(c.x,c.y,c.r,0,Math.PI*2);CTX.fill();
-        CTX.globalAlpha=0.5; CTX.strokeStyle='#7aa5d8'; CTX.lineWidth=4*DPR;
-        CTX.beginPath(); CTX.moveTo(c.x,c.y); CTX.lineTo(c.x - c.vx*0.05, c.y - c.vy*0.05); CTX.stroke(); CTX.globalAlpha=1;
-      }
-      // Mines
-      for(const m of M.mines){
-        const pct=clamp(1-m.t/2.4,0,1);
-        CTX.fillStyle='#2d3744'; CTX.beginPath(); CTX.arc(m.x,m.y,m.r,0,Math.PI*2); CTX.fill();
-        CTX.strokeStyle='#ffd28a'; CTX.globalAlpha=0.3+0.7*pct; CTX.lineWidth=2*DPR;
-        CTX.beginPath(); CTX.arc(m.x,m.y,m.r+6*DPR*Math.sin(performance.now()/150),0,Math.PI*2); CTX.stroke(); CTX.globalAlpha=1;
-      }
-      // Shards
+      for(const c of M.comets){CTX.fillStyle='#b8d7ff';CTX.beginPath();CTX.arc(c.x,c.y,c.r,0,Math.PI*2);CTX.fill();}
+      for(const m of M.mines){CTX.fillStyle='#2d3744';CTX.beginPath();CTX.arc(m.x,m.y,m.r,0,Math.PI*2);CTX.fill();}
       for(const s of M.shards){CTX.fillStyle='#ffb38a'; CTX.beginPath(); CTX.arc(s.x,s.y,s.r,0,Math.PI*2); CTX.fill();}
-      // Stars
       for(const s of M.stars){CTX.fillStyle='#9be7d7';CTX.beginPath();CTX.arc(s.x,s.y,s.r,0,Math.PI*2);CTX.fill();}
-
-      // Player
       CTX.fillStyle='#e6eef6';CTX.beginPath();CTX.arc(M.px,M.py,M.r,0,Math.PI*2);CTX.fill();
       CTX.fillStyle='#9fb0c6';CTX.font=`700 ${14*DPR}px Inter`;CTX.fillText(`Score: ${Math.floor(A.score)}`,CANVAS.width/2,90*DPR);
     }
   }
 
+  // ===== Research Overlay (LINEAR + tabs per category) =====
   function drawResearchOverlay(){
     if(!(state.ui.researchOverlay && state.ui.researchOverlay.open)) return;
     const O=state.ui.researchOverlay;
+    const tree = TREES[O.treeIndex % TREES.length];
+    const items = tree.items;
+    CTX.globalAlpha=0.92; CTX.fillStyle='#03060a'; CTX.fillRect(0,0,CANVAS.width,CANVAS.height); CTX.globalAlpha=1;
 
-    // Dim background
-    CTX.globalAlpha=0.9; CTX.fillStyle='#03060a'; CTX.fillRect(0,0,CANVAS.width,CANVAS.height); CTX.globalAlpha=1;
+    // Header
+    CTX.fillStyle='#e6eef6'; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='left';
+    CTX.fillText(`Research Tree — drag to pan • hover nodes for details • click to research`,12*DPR,20*DPR);
 
-    // Compute bounds and unit so whole tree fits
-    const xs=TECH.map(t=>t.pos[0]), ys=TECH.map(t=>t.pos[1]);
-    const minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
-    const pad=160*DPR;
-    const wUnits=(maxX-minX)||1, hUnits=(maxY-minY)||1;
-    const unitRaw=Math.min((CANVAS.width-pad*2)/wUnits,(CANVAS.height-pad*2)/hUnits);
-    const unit=Math.min(Math.max(unitRaw,80*DPR),180*DPR);
-
-    // Center camera if first open (cam at 0,0 means centered)
-    // Transform world->screen
-    function toScreen(px,py){
-      const cx=CANVAS.width/2 + O.camX;
-      const cy=CANVAS.height/2 + O.camY;
-      // Offset by mid to center the tree
-      const midX=(minX+maxX)/2, midY=(minY+maxY)/2;
-      const x=cx + (px-midX)*unit;
-      const y=cy + (py-midY)*unit;
-      return {x,y};
+    // Tabs
+    const tabH=28*DPR, gap=8*DPR;
+    let tx=12*DPR, ty=36*DPR;
+    for(let i=0;i<TREES.length;i++){
+      const t=TREES[i]; const w=measure(t.name,12*DPR,'700')*DPR+24*DPR;
+      const active=(i===O.treeIndex);
+      CTX.fillStyle=active?'#1e2a38':'#11161d'; roundRect(tx,ty,w,tabH,10*DPR,true,false);
+      CTX.fillStyle=active?'#e6eef6':'#8aa0ba'; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(t.name,tx+w/2,ty+tabH/2);
+      addClick(tx,ty,w,tabH,(()=>{const idx=i; return ()=>{O.treeIndex=idx;};})());
+      tx+=w+gap;
     }
 
-    // Title & Close button
-    CTX.fillStyle='#e6eef6'; CTX.font=`800 ${18*DPR}px Inter`; CTX.textAlign='left'; CTX.fillText('Research Tree — drag to pan • hover nodes for details • click to research',20*DPR,28*DPR);
+    // Close
     const closeW=44*DPR, closeH=32*DPR; const cbx=CANVAS.width-closeW-18*DPR, cby=18*DPR;
     drawButton(cbx,cby,closeW,closeH,'✕',true,true); addClick(cbx,cby,closeW,closeH,()=>{O.open=false;});
 
+    // Layout - linear by tier
+    const originX=(CANVAS.width/2)+O.camX, originY=(CANVAS.height*0.18)+O.camY;
+    const rowStep=130*DPR, colStep=210*DPR;
+
+    const byTier={};
+    for(const it of items){ const t=it.tier||0; (byTier[t]=byTier[t]||[]).push(it); }
+    const tiers=Object.keys(byTier).map(n=>+n).sort((a,b)=>a-b);
+
+    const posMap={};
+    for(const tier of tiers){
+      const arr=byTier[tier];
+      const k=arr.length;
+      for(let i=0;i<k;i++){
+        const x=originX + (i-(k-1)/2)*colStep;
+        const y=originY + tier*rowStep;
+        posMap[arr[i].id]={x,y};
+      }
+    }
+
     // Edges
-    for(const t of TECH){
-      for(const p of t.pre){
-        const tp=TECH.find(x=>x.id===p);
-        const a=toScreen(tp.pos[0],tp.pos[1]);
-        const b=toScreen(t.pos[0],t.pos[1]);
-        CTX.strokeStyle='#223142'; CTX.lineWidth=2*DPR; CTX.beginPath(); CTX.moveTo(a.x,a.y); CTX.lineTo(b.x,b.y); CTX.stroke();
+    CTX.strokeStyle='#223142'; CTX.lineWidth=2*DPR;
+    CTX.lineCap='round';
+    for(const it of items){
+      const a=posMap[it.id]; if(!a) continue;
+      for(const pre of it.pre){
+        const p=techById(pre); if(!p || p.tree!==tree.id) continue;
+        const b=posMap[pre]; if(!b) continue;
+        CTX.beginPath(); CTX.moveTo(a.x,a.y-20*DPR); CTX.lineTo(b.x,b.y+20*DPR); CTX.stroke();
       }
     }
 
     // Nodes
     O.hover=null;
-    const r=22*DPR;
-    for(const t of TECH){
-      const s=toScreen(t.pos[0],t.pos[1]);
-      const owned=hasTech(t.id); const avail=techAvailable(t)&&state.rp>=t.rp;
-      CTX.fillStyle=owned?'#1f3427':(avail?'#1f2631':'#11161d'); CTX.beginPath(); CTX.arc(s.x,s.y,r,0,Math.PI*2); CTX.fill();
+    for(const it of items){
+      const pos=posMap[it.id]; if(!pos) continue;
+      const owned=hasTech(it.id); const avail=techAvailable(it)&&state.rp>=it.rp;
+      const r=18*DPR;
+      CTX.fillStyle=owned?'#1f3427':(avail?'#1f2631':'#11161d'); CTX.beginPath(); CTX.arc(pos.x,pos.y,r,0,Math.PI*2); CTX.fill();
       CTX.strokeStyle=avail?'#7fd1ff':'#2a3949'; CTX.lineWidth=2*DPR; CTX.stroke();
-      CTX.fillStyle=owned?'#c8f7da':'#e6eef6'; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='bottom'; CTX.fillText(t.name,s.x,s.y-r-10*DPR);
-      CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${11*DPR}px Inter`; CTX.textBaseline='top'; CTX.fillText(`${t.rp} RP`,s.x,s.y+r+6*DPR);
-      // Hover detect
-      const d2=(input.mx-s.x)**2+(input.my-s.y)**2;
-      if(d2<=r*r) O.hover=t;
-      // Click to research
-      addClick(s.x-r,s.y-r,r*2,r*2,()=>{ if(techAvailable(t)){ buyTech(t); } });
+      CTX.fillStyle=owned?'#c8f7da':'#e6eef6'; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='bottom';
+      CTX.fillText(it.name,pos.x,pos.y-r-10*DPR);
+      CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${11*DPR}px Inter`; CTX.textBaseline='top';
+      CTX.fillText(`${it.rp} RP`,pos.x,pos.y+r+6*DPR);
+      const d2=(input.mx-pos.x)**2+(input.my-pos.y)**2; if(d2<=r*r) O.hover=it;
+      addClick(pos.x-r,pos.y-r,r*2,r*2,()=>{ if(techAvailable(it)){ buyTech(it); } });
     }
 
-    // Tooltip
     if(O.hover){
       const t=O.hover; const owned=hasTech(t.id); const avail=techAvailable(t)&&state.rp>=t.rp;
       const status=owned?'Owned':(avail?'Available':'Locked');
-      const lines=[t.name, t.desc, `Cost: ${t.rp} RP • ${status}`];
-      tooltip(input.mx,input.my,lines);
+      tooltip(input.mx,input.my,[t.name,t.desc,`Cost: ${t.rp} RP • ${status}`]);
     }
   }
 
@@ -629,10 +623,15 @@
     if(A.gate.tries<=0) endArcade();
   }
 
-  function update(dt){
-    addBits(totalPPS()*dt); addRP(rpPerSec()*dt);
-    state.combo.v=clamp(state.combo.v-state.combo.decay*dt,0,state.combo.max);
-    updateGlitch(dt); updateRift(dt); updateArcade(dt); updateCharge(dt); updateParticles(dt); updateToasts(dt);
+  function endArcade(){
+    if(!state.arcade.active) return;
+    const s=Math.max(0,Math.floor(state.arcade.score)); const mode=state.arcade.mode; state.arcade.active=false;
+    let bits=0,rp=0;
+    if(mode==='pulse'){bits=s*3;rp=s*0.3;}
+    else if(mode==='gate'){bits=s*8;rp=s*0.6;}
+    else if(mode==='meteor'){bits=s*6;rp=s*0.45;}
+    bits*=mods.arcadeReward; rp*=mods.arcadeReward;
+    if(bits||rp){addBits(bits);addRP(rp);toast(`Arcade reward: +${fmt(bits)} bits, +${fmt(rp)} RP`);}
   }
 
   function draw(dt){
@@ -734,43 +733,41 @@
           const fsBtn=14*DPR*us; CTX.font=`700 ${fsBtn}px Inter`;
           const bw=Math.max(100*DPR*us,CTX.measureText(label).width+28*DPR*us), bh=32*DPR*us;
           const bx=listX+listW-bw-12*DPR*us, by=y+rowH-bh-10*DPR*us;
-
           if(isNarrow){
             CTX.fillStyle=afford?'#b8f0c2':'#93a6bf'; CTX.font=`800 ${13*DPR*us}px Inter`; CTX.textAlign='left';
             CTX.fillText(`Cost: ${fmt(cost)}`,nameX,nameY+20*DPR*us);
             CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR*us}px Inter`;
-            CTX.fillText(`Owned: ${n} • +${fmt(moduleProd(m.id))}/s${m.rp?` • RP: ${m.rp}/s`:''}`,nameX,nameY+38*DPR*us);
+            const rpLine = m.rp?` • RP: ${m.rp}/s`:'';
+            CTX.fillText(`Owned: ${n} • +${fmt(moduleProd(m.id))}/s${rpLine}`,nameX,nameY+38*DPR*us);
           }else{
             CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR*us}px Inter`; CTX.textAlign='left';
-            CTX.fillText(`Owned: ${n} • +${fmt(moduleProd(m.id))}/s${m.rp?` • RP: ${m.rp}/s`:''}`,nameX,nameY+22*DPR*us);
+            const rpLine = m.rp?` • RP: ${m.rp}/s`:'';
+            CTX.fillText(`Owned: ${n} • +${fmt(moduleProd(m.id))}/s${rpLine}`,nameX,nameY+22*DPR*us);
             CTX.fillStyle=afford?'#b8f0c2':'#93a6bf'; CTX.font=`800 ${14*DPR*us}px Inter`; CTX.textAlign='right';
             CTX.fillText(`Cost: ${fmt(cost)}`,bx-12*DPR*us,nameY+2*DPR*us);
           }
-
           drawButton(bx,by,bw,bh,label,afford,true); addClick(bx,by,bw,bh,()=>buyModule(m.id));
           y+=rowH+10*DPR*us;
         }
       }
 
       if(state.tab==='Research'){
-        // Open Fullscreen button
-        const btnW=180*DPR, btnH=34*DPR;
-        drawButton(listX,y,btnW,btnH,'Open Full Tree',true,true);
-        addClick(listX,y,btnW,btnH,()=>{ state.ui.researchOverlay.open=true; state.ui.researchOverlay.camX=0; state.ui.researchOverlay.camY=0; });
+        const btnW=220*DPR, btnH=34*DPR;
+        drawButton(listX,y,btnW,btnH,'Open Research (Linear)',true,true);
+        addClick(listX,y,btnW,btnH,()=>{ state.ui.researchOverlay.open=true; /* keep previous camera offsets */ });
         y+=btnH+10*DPR;
 
-        const cxTree=listX+listW/2, unit=120*DPR;
-        const maxDepth=TECH.reduce((m,t)=>Math.max(m,t.pos[1]),0);
-        for(const t of TECH){ for(const p of t.pre){ const tp=TECH.find(x=>x.id===p); const x1=cxTree+(tp.pos[0]*unit), y1=y+30*DPR+tp.pos[1]*unit; const x2=cxTree+(t.pos[0]*unit), y2=y+30*DPR+t.pos[1]*unit; CTX.strokeStyle='#24303c'; CTX.lineWidth=2*DPR; CTX.beginPath(); CTX.moveTo(x1,y1); CTX.lineTo(x2,y2); CTX.stroke(); } }
-        for(const t of TECH){
-          const nx=cxTree+(t.pos[0]*unit), ny=y+30*DPR+t.pos[1]*unit; const owned=hasTech(t.id); const avail=techAvailable(t)&&state.rp>=t.rp;
-          CTX.fillStyle=owned?'#1f3427':(avail?'#1f2631':'#11161d'); CTX.beginPath(); CTX.arc(nx,ny,22*DPR,0,Math.PI*2); CTX.fill();
-          CTX.strokeStyle=avail?'#7fd1ff':'#2a3949'; CTX.lineWidth=2*DPR; CTX.stroke();
-          CTX.fillStyle=owned?'#c8f7da':'#e6eef6'; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(t.name,nx,ny-34*DPR);
-          CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${11*DPR}px Inter`; CTX.fillText(`${t.desc} • ${t.rp} RP`,nx,ny+34*DPR);
-          addClick(nx-24*DPR,ny-24*DPR,48*DPR,48*DPR,()=>buyTech(t));
+        const avail = TECH.filter(t=>techAvailable(t)).slice(0,8);
+        for(const t of avail){
+          const rowH=56*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false);
+          CTX.fillStyle='#e6eef6'; CTX.font=`700 ${14*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top';
+          CTX.fillText(`${t.name} — ${t.rp} RP`,listX+12*DPR,y+10*DPR);
+          CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR}px Inter`; CTX.fillText(t.desc,listX+12*DPR,y+28*DPR);
+          const bw=80*DPR,bh=28*DPR; const bx=listX+listW-bw-10*DPR, by=y+rowH-bh-10*DPR;
+          const can=state.rp>=t.rp;
+          drawButton(bx,by,bw,bh,'Research',can,true); addClick(bx,by,bw,bh,()=>buyTech(t));
+          y+=rowH+8*DPR;
         }
-        y+=30*DPR+(maxDepth+1)*unit+40*DPR;
       }
 
       if(state.tab==='Arcade'){
@@ -787,11 +784,11 @@
         }
         row('Start Pulse Rush','Rapid orbs spawn. Click them for Bits and RP.',()=>startPulseRush());
         row('Start Timing Gate','Stop the marker in the zone with Space/click.',()=>startGate());
-        row('Start Meteor Dodge+','Dodge meteors, comets, shards, and lasers.',()=>startMeteor());
+        row('Start Meteor Dodge+','Dodge meteors, shards & lasers.',()=>startMeteor());
       }
 
       if(state.tab==='Achievements'){
-        const rows=[['First Pulse','Release a charged pulse once',state.lifetimeBits>0],['Collector','Own 20 modules total',state.modules.reduce((a,b)=>a+(b.count||0),0)>=20],['Researcher','Spend 50 RP',state.rpTotal>=50],['Arcader','Finish a minigame',state.arcadeLastRewarded]];
+        const rows=[['First Pulse','Release a charged pulse once',state.lifetimeBits>0],['Collector','Own 30 modules total',state.modules.reduce((a,b)=>a+(b.count||0),0)>=30],['Researcher','Spend 200 RP',state.rpTotal>=200],['Arcader','Finish a minigame',state.arcadeLastRewarded]];
         for(const r of rows){const rowH=48*DPR; CTX.fillStyle=r[2]?'#14211a':'#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false); CTX.fillStyle=r[2]?'#e2f6e9':'#e8f0f8'; CTX.font=`800 ${14*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(r[0],listX+12*DPR,y+rowH/2-10*DPR); CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR}px Inter`; CTX.fillText(r[1],listX+12*DPR,y+rowH/2+10*DPR); y+=rowH+8*DPR;}
       }
 
@@ -826,13 +823,13 @@
 
       CTX.restore();
 
-      // ===== SCROLL FIX (measures with offset undone) =====
+      // Scroll handling
       state.ui.maxScroll = Math.max(0, (y + sOff) - (listY + listH));
       sOff = clamp(sOff, 0, state.ui.maxScroll);
       state.scroll[state.tab] = sOff;
 
-      // Wheel & inertia
-      if(!(state.ui.researchOverlay && state.ui.researchOverlay.open) && Math.abs(input.wheel)>0.1){ state.ui.scrollVel += input.wheel*0.6; input.wheel=0; } else if(state.ui.researchOverlay && state.ui.researchOverlay.open){ input.wheel=0; }
+      if(!(state.ui.researchOverlay && state.ui.researchOverlay.open) && Math.abs(input.wheel)>0.1){ state.ui.scrollVel += input.wheel*0.6; input.wheel=0; }
+      else if(state.ui.researchOverlay && state.ui.researchOverlay.open){ input.wheel=0; }
       if(!state.ui.scrollDrag.active){
         if(Math.abs(state.ui.scrollVel)>0.1){
           sOff = clamp(sOff + state.ui.scrollVel, 0, state.ui.maxScroll);
@@ -850,16 +847,22 @@
   function dispatchClick(px,py){
     if(state.rift.active&&tryClickRift(px,py)) return;
     for(let i=clicks.length-1;i>=0;i--){const c=clicks[i]; if(hit(px,py,c)){c.onClick(px,py); return;}}
-    if(state.arcade.active){/* handleArcadeClick consumed via clicks in modes */ return;}
+    if(state.arcade.active){ return; }
     if(tryClickGlitch(px,py)) return;
   }
 
-  function doExport(){try{const data=localStorage.getItem(SAVE_KEY)||JSON.stringify({...state,mults,mods}); if(navigator.clipboard&&location.protocol!=='file:'){navigator.clipboard.writeText(data).then(()=>toast('Save copied')).catch(()=>alert(data));}else alert(data);}catch{alert('Export failed');}}
+  function doExport(){try{const data=localStorage.getItem(SAVE_KEY)||JSON.stringify({...state,mults,mods}); if(navigator.clipboard&&location.protocol!=='file:'){navigator.clipboard.writeText(data).then(()=>toast('Save copied')).catch(()=>alert(data));}else alert(data);}catch{toast('Export failed');}}
   function doImport(){const data=prompt('Paste your save data:'); if(!data)return; try{localStorage.setItem(SAVE_KEY,data);toast('Imported. Reloading…');setTimeout(()=>location.reload(),400);}catch{toast('Import failed');}}
 
-  let saveAcc=0; function autoSave(dt){saveAcc+=dt;if(saveAcc>10){saveAcc=0;save();}}
-
-  let last=nowMs(); function loop(){resize();const t=nowMs();let dt=(t-last)/1000;last=t;dt=clamp(dt,0,0.1);if(state.settings.lowFX)dt*=0.9;update(dt);draw(dt);autoSave(dt);prevDown=input.down;requestAnimationFrame(loop);} loop();
+  function addBits(dtBits){ if(!isFinite(dtBits)) return; state.bits+=dtBits; state.bitsTotal+=dtBits; state.lifetimeBits+=dtBits; }
+  let saveAcc=0; let last=nowMs();
+  function update(dt){
+    addBits(totalPPS()*dt); addRP(rpPerSec()*dt);
+    state.combo.v=clamp(state.combo.v-state.combo.decay*dt,0,state.combo.max);
+    updateGlitch(dt); updateRift(dt); updateArcade(dt); updateCharge(dt); updateParticles(dt); updateToasts(dt);
+  }
+  function autoSave(dt){saveAcc+=dt;if(saveAcc>10){saveAcc=0;save();}}
+  function loop(){resize();const t=nowMs();let dt=(t-last)/1000;last=t;dt=clamp(dt,0,0.1);if(state.settings.lowFX)dt*=0.9;update(dt);draw(dt);autoSave(dt);prevDown=input.down;requestAnimationFrame(loop);} loop();
 })();
 </script>
 </body>
