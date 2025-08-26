@@ -306,7 +306,8 @@
   function techAvailable(t){return !hasTech(t.id)&&t.pre.every(p=>hasTech(p));}
   function buyTech(t){if(!techAvailable(t)||state.rp<t.rp)return; state.rp-=t.rp; state.tech.push(t.id); t.apply(); toast(`Researched: ${t.name}`); beep(760,0.05,0.03);}
 
-  function coreGain(){return Math.floor(Math.sqrt(state.lifetimeBits/1e6));}
+function coreGain(){
+  return Math.floor(Math.sqrt(state.bits / 1e6));
   function tryAscend(){
     const gain=coreGain(); if(gain<=0){toast('Generate more Bits to ascend');return;}
     state.ascend.cores+=gain; state.ascend.best=Math.max(state.ascend.best,state.ascend.cores);
