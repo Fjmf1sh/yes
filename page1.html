@@ -311,12 +311,33 @@ function coreGain(){
   return Math.floor(Math.sqrt(state.bits / 1e6));
 }
 
-  function tryAscend(){
-    const gain=coreGain(); if(gain<=0){toast('Generate more Bits to ascend');return;}
-    state.ascend.cores+=gain; state.ascend.best=Math.max(state.ascend.best,state.ascend.cores);
-    state.bits=0; state.bitsTotal=0; state.clickBase=1; state.clickMult=1; state.modules=MODULES.map(m=>({id:m.id,count:0})); state.upgrades=[]; state.rp=0; state.tech=[...state.tech];
-    state.glitch={next:rand(18,40),life:0,x:0,y:0,active:false,value:0}; toast(`Ascended: +${gain} core(s) → global x${(1+state.ascend.cores*0.1).toFixed(2)})`); beep(880,0.07,0.03); save();
-  }
+function tryAscend(){
+  const gain = coreGain();
+  if (gain <= 0) { toast('Generate more Bits to ascend'); return; }
+  state.ascend.cores += gain;
+  state.ascend.best = Math.max(state.ascend.best, state.ascend.cores);
+  state.bits = 0;
+  state.bitsTotal = 0;
+  state.clickBase = 1;
+  state.clickMult = 1;
+  state.modules = MODULES.map(m => ({id: m.id, count: 0}));
+  state.upgrades = [];
+  state.rp = 0;
+  state.tech = []; 
+  mults.global = 1; mults.modules = 1; mults.glitch = 1; mults.combo = 1;
+  Object.assign(mods, {
+    clickCurve: 1, rpGain: 1, arcadeReward: 1, riftHP: 1, gateZone: 1,
+    pulseSize: 1, pulseLife: 1, flappyGravity: 1, ringLeniency: 1,
+    costMult: 1, glitchRate: 1, riftReward: 1
+  });
+  state.charge = {active:false, t:0, tMax:1.6};
+  state.critZone = {lo:0.92, hi:1.0, mult:3};
+  state.combo = {v:0, max:0.5, decay:0.12};
+  state.glitch = {next:rand(18,40), life:0, x:0, y:0, active:false, value:0};
+  toast(`Ascended: +${gain} core(s) → global x${(1 + state.ascend.cores*0.1).toFixed(2)}`);
+  beep(880, 0.07, 0.03);
+  save();
+}
 
   function updateGlitch(dt){
     const g=state.glitch;
