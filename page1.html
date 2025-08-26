@@ -242,7 +242,7 @@
 
   // Flatten TECH for logic
   const TECH = TREES.flatMap(tr => tr.items.map(it => ({...it, tree: tr.id})));
-  const SAVE_KEY=('quantum_forge_linear_categories@'+(location.host||'local'));
+  const SAVE_KEY=('quantum_forge_v10@'+(location.host||'local'));
   function ensureDefaults(){
     state.ui = state.ui || {drawerOpen:false,scale:1,sideRect:null,maxScroll:0,scrollDrag:{active:false,lastY:0,vy:0,tab:null},scrollVel:0};
     if(!state.ui.researchOverlay){ state.ui.researchOverlay={open:false,camX:0,camY:0,hover:null,pan:{active:false,lastX:0,lastY:0,moved:false},treeIndex:0}; }
