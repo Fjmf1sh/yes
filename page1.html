@@ -113,7 +113,7 @@ CANVAS.addEventListener('pointermove',onPointerMove);
   const MODULES=[
     {id:0,name:'Nanite Swarm', base:20,   mult:1.15, prod:0.14},
     {id:1,name:'Signal Printer', base:130, mult:1.15, prod:1.1},
-    {id:2,name:'Research Lab',  base:500,mult:1.15, prod:0.01, rp:0.3},
+    {id:2,name:'Research Lab',  base:500,mult:1.15, prod:0.01, rp:0.01},
     {id:3,name:'Biofarm',       base:1400, mult:1.15, prod:7.5},
     {id:4,name:'Ore Synth',     base:16000,mult:1.15, prod:44},
     {id:5,name:'Assembler',     base:175000,mult:1.15, prod:230},
@@ -122,7 +122,7 @@ CANVAS.addEventListener('pointermove',onPointerMove);
     {id:8,name:'Time Fork',     base:5500000000,mult:1.15, prod:210000},
     {id:9,name:'Singularity',   base:82000000000,mult:1.15, prod:1300000},
     {id:10,name:'Quantum Loom',       base:1200000000000,mult:1.15, prod:8200000},
-    {id:11,name:'Quantum Institute',  base:18000000000000,mult:1.15, prod:54000000, rp:5},
+    {id:11,name:'Quantum Institute',  base:18000000000000,mult:1.15, prod:54000000, rp:.12},
     {id:12,name:'Grav Well',          base:270000000000000,mult:1.15, prod:210000000},
     {id:13,name:'Star Foundry',       base:4000000000000000,mult:1.15, prod:900000000},
     {id:14,name:'Cosmic Lattice',     base:65000000000000000,mult:1.15, prod:3500000000},
@@ -131,7 +131,7 @@ CANVAS.addEventListener('pointermove',onPointerMove);
     {id:17,name:'Axion Furnace',      base:1e23,mult:1.15, prod:2.4e11},
     {id:18,name:'Quasar Loom',        base:2.5e24,mult:1.15, prod:1.1e12},
     {id:19,name:'Dark-Matter Mill',   base:7.5e25,mult:1.15, prod:4.8e12},
-    {id:20,name:'Chrono Array',       base:2e27,mult:1.15, prod:2.1e13, rp:10}
+    {id:20,name:'Chrono Array',       base:2e27,mult:1.15, prod:2.1e13, rp:0.25}
   ];
 
   const state={
@@ -235,7 +235,7 @@ CANVAS.addEventListener('pointermove',onPointerMove);
   ];
   const TECH = TREES.flatMap(tr => tr.items.map(it => ({...it, tree: tr.id})));
 
-  const SAVE_KEY=('quantum_forge_v15@'+(location.host||'local'));
+  const SAVE_KEY=('new_quantum_forge_v15@'+(location.host||'local'));
   function save(){ if(state._suspendSaves) return; state.lastSave=Date.now(); const data={...state,mults,mods}; try{localStorage.setItem(SAVE_KEY,JSON.stringify(data));}catch{} }
   function load(){
     try{
