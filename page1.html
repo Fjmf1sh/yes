@@ -13,13 +13,15 @@
 </head>
 <body>
 <canvas id="game"></canvas>
+<input id="importFile" type="file" accept=".qfs,application/json" style="display:none" />
 <script>
 (function(){
   'use strict';
   const CANVAS=document.getElementById('game');
   const CTX=CANVAS.getContext('2d',{alpha:false});
+  const FILE_IN=document.getElementById('importFile');
   let DPR=Math.max(1,Math.min(3,(window.devicePixelRatio||1)));
-  let CLICK_EPS=6;
+  let prevDown=false;
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const lerp=(a,b,t)=>a+(b-a)*t;
@@ -39,63 +41,70 @@
   window.addEventListener('resize',resize,{passive:true}); resize();
 
   const input={mx:0,my:0,down:false,wheel:0};
-  let prevDown=false;
   function canvasPos(evt){const r=CANVAS.getBoundingClientRect();return {x:(evt.clientX-r.left)*DPR,y:(evt.clientY-r.top)*DPR};}
-
-  function onPointerMove(e){
+    function onPointerMove(e){
     const p=canvasPos(e); input.mx=p.x; input.my=p.y;
     const dr=state.ui.scrollDrag;
-    if(dr.active&&dr.tab===state.tab){
-      const dy=input.my-dr.lastY; const max=state.ui.maxScroll||0;
-      state.scroll[state.tab]=clamp((state.scroll[state.tab]||0)-dy,0,max);
+    if(dr.active){
+      const dy=input.my-dr.lastY;
+      if(state.overlay.researchOpen){
+        const maxY=(state.researchMaxY||2000*DPR);
+        state.scrollY = clamp((state.scrollY||0) - dy, 0, maxY);
+      } else if(dr.tab===state.tab){
+        const max=state.ui.maxScroll||0;
+        state.scroll[state.tab]=clamp((state.scroll[state.tab]||0)-dy,0,max);
+      }
       dr.vy=dy; dr.lastY=input.my;
     }
   }
+
   function onPointerDown(e){
     const p=canvasPos(e); input.mx=p.x; input.my=p.y; input.down=true;
     if(state.arcade.active && state.arcade.mode==='gate'){
       gateStop();
       return;
     }
-    const r=state.ui.sideRect;
-    if(r && input.mx>=r.x && input.mx<=r.x+r.w && input.my>=r.y && input.my<=r.y+r.h){
-      state.ui.scrollDrag={active:true,lastY:input.my,vy:0,tab:state.tab};
+    if(state.overlay.researchOpen){
+      state.ui.scrollDrag={active:true,lastY:input.my,vy:0,tab:'ResearchOverlay'};
+    }else{
+      const r=state.ui.sideRect;
+      if(r && input.mx>=r.x && input.mx<=r.x+r.w && input.my>=r.y && input.my<=r.y+r.h){
+        state.ui.scrollDrag={active:true,lastY:input.my,vy:0,tab:state.tab};
+      }
     }
   }
+
   function onPointerUp(e){
     const p=canvasPos(e); input.mx=p.x; input.my=p.y; input.down=false;
     if(state.ui.scrollDrag.active){
-      state.ui.scrollVel+=-state.ui.scrollDrag.vy*0.8;
-      state.ui.scrollDrag={active:false,lastY:0,vy:0,tab:null};
+      if(state.overlay.researchOpen){
+        state.ui.scrollDrag={active:false,lastY:0,vy:0,tab:null};
+      }else{
+        state.ui.scrollVel += -state.ui.scrollDrag.vy*0.8;
+        state.ui.scrollDrag={active:false,lastY:0,vy:0,tab:null};
+      }
     }
     dispatchClick(p.x,p.y);
   }
-  if(window.PointerEvent){
-    CANVAS.addEventListener('pointermove',onPointerMove);
-    CANVAS.addEventListener('pointerdown',onPointerDown);
-    CANVAS.addEventListener('pointerup',onPointerUp);
-  }else{
-    CANVAS.addEventListener('mousemove',e=>{const p=canvasPos(e);input.mx=p.x;input.my=p.y;});
-    CANVAS.addEventListener('mousedown',onPointerDown);
-    CANVAS.addEventListener('mouseup',onPointerUp);
-    CANVAS.addEventListener('touchstart',e=>{const t=e.changedTouches[0];const r=CANVAS.getBoundingClientRect();input.mx=(t.clientX-r.left)*DPR;input.my=(t.clientY-r.top)*DPR;input.down=true;e.preventDefault();},{passive:false});
-    CANVAS.addEventListener('touchend',e=>{const t=e.changedTouches[0];const r=CANVAS.getBoundingClientRect();const x=(t.clientX-r.left)*DPR,y=(t.clientY-r.top)*DPR;input.down=false;dispatchClick(x,y);},{passive:true});
-  }
+CANVAS.addEventListener('pointermove',onPointerMove);
+  CANVAS.addEventListener('pointerdown',onPointerDown);
+  CANVAS.addEventListener('pointerup',onPointerUp);
   CANVAS.addEventListener('wheel',e=>{input.wheel+=e.deltaY;},{passive:true});
 
-  window.addEventListener('keydown',(e)=>{
+  window.addEventListener('keydown',async (e)=>{
     if(state.arcade.active){
       if(state.arcade.mode==='gate'&&(e.code==='Space'||e.key===' ')) gateStop();
       if(e.key==='Escape') endArcade();
       return;
     }
-    if(e.key==='e'||e.key==='E') doExport();
-    if(e.key==='i'||e.key==='I') doImport();
+    if(e.key==='e'||e.key==='E') await doExport();
+    if(e.key==='i'||e.key==='I') await doImport();
     if(e.key==='p'||e.key==='P') tryAscend();
     if(e.key==='m'||e.key==='M') state.settings.mute=!state.settings.mute;
     if(e.key==='-') cycleBuyQty(-1);
     if(e.key==='=') cycleBuyQty(+1);
     const idx='1234567890'.indexOf(e.key); if(idx!==-1) buyModule(idx);
+    if(e.key==='Escape' && state.overlay.researchOpen){ state.overlay.researchOpen=false; }
   });
 
   let AC=null; function beep(f=420,d=0.05,v=0.02,type='triangle'){ if(state.settings.mute) return; try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(),g=AC.createGain(); o.type=type;o.frequency.value=f;g.gain.value=v;o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d);}catch{} }
@@ -126,7 +135,7 @@
   ];
 
   const state={
-    __version:9,
+    __version:12,
     bits:0,bitsTotal:0,lifetimeBits:0,
     rp:0,rpTotal:0,
     clickBase:1,clickMult:1,
@@ -137,11 +146,9 @@
     upgrades:[],tech:[],achievements:[],
     ascend:{cores:0,best:0},
     settings:{particles:true,mute:false,lowFX:false},
-    // hidden cheat
     cheat:{unlocked:false,taps:0,req:50,x10:false},
     lastSave:Date.now(),
     tab:'Forge',buyQtyIndex:0,
-    // research category tab index
     researchCat:0,
     scroll:{Forge:0,Shop:0,Research:0,Arcade:0,Achievements:0,Stats:0,Ascend:0,Settings:0,Cheats:0},
     glitch:{next:rand(18,40),life:0,x:0,y:0,active:false,value:0},
@@ -153,13 +160,15 @@
       drawerOpen:false,scale:1,sideRect:null,maxScroll:0,
       scrollDrag:{active:false,lastY:0,vy:0,tab:null},scrollVel:0
     },
+    overlay:{researchOpen:false},
+    _suspendSaves:false
   };
 
   const mults={global:1,modules:1,glitch:1,combo:1};
   const mods={clickCurve:1,rpGain:1,arcadeReward:1,riftHP:1,gateZone:1,pulseSize:1,pulseLife:1,costMult:1,glitchRate:1,riftReward:1};
   const BUY_QTY=[1,10,100,'Max'];
 
-  // ===== RESEARCH TREES (linear categories) =====
+  // ===== RESEARCH TREES (same data) =====
   const TREES=[
     {name:'Core', id:'core', items:[
       {id:'t_over1',tier:0,rp:50, pre:[],             name:'Overclock I',     desc:'+10% global',       apply:()=>{mults.global*=1.10;}},
@@ -224,16 +233,10 @@
       {id:'d_reflect',  tier:3,rp:900,pre:['d_cushion'],name:'Reflective Mesh',    desc:'+10% global',          apply:()=>{mults.global*=1.10;}}
     ]}
   ];
-
   const TECH = TREES.flatMap(tr => tr.items.map(it => ({...it, tree: tr.id})));
-  const SAVE_KEY=('quantum_forge_v7@'+(location.host||'local'));
 
-  function ensureDefaults(){
-    state.ui = state.ui || {drawerOpen:false,scale:1,sideRect:null,maxScroll:0,scrollDrag:{active:false,lastY:0,vy:0,tab:null},scrollVel:0};
-    const byId={}; (state.modules||[]).forEach(m=>{byId[m.id]=m;});
-    state.modules = MODULES.map(m => byId[m.id] ? {id:m.id,count:byId[m.id].count||0} : {id:m.id,count:0});
-  }
-  function save(){state.lastSave=Date.now();const data={...state,mults,mods};try{localStorage.setItem(SAVE_KEY,JSON.stringify(data));}catch{}}
+  const SAVE_KEY=('quantum_forge_v15@'+(location.host||'local'));
+  function save(){ if(state._suspendSaves) return; state.lastSave=Date.now(); const data={...state,mults,mods}; try{localStorage.setItem(SAVE_KEY,JSON.stringify(data));}catch{} }
   function load(){
     try{
       let raw=localStorage.getItem(SAVE_KEY);
@@ -247,6 +250,13 @@
       const secs=clamp((Date.now()-(d.lastSave||Date.now()))/1000,0,3600*8);
       const pps=totalPPS(); const off=pps*secs*0.75; if(off>0){ addBits(off); toast(`Offline +${fmt(off)} bits`); }
     }catch{ ensureDefaults(); }
+  }
+  function ensureDefaults(){
+state.scrollY = state.scrollY || 0;
+    state.ui = state.ui || {drawerOpen:false,scale:1,sideRect:null,maxScroll:0,scrollDrag:{active:false,lastY:0,vy:0,tab:null
+},scrollVel:0};
+    const byId={}; (state.modules||[]).forEach(m=>{byId[m.id]=m;});
+    state.modules = MODULES.map(m => byId[m.id] ? {id:m.id,count:byId[m.id].count||0} : {id:m.id,count:0});
   }
   load();
   document.addEventListener('visibilitychange',()=>{if(document.hidden)save();},{passive:true});
@@ -290,46 +300,22 @@
   function techAvailable(t){return !hasTech(t.id)&&t.pre.every(p=>hasTech(p));}
   function buyTech(t){if(!techAvailable(t)||state.rp<t.rp)return; state.rp-=t.rp; state.tech.push(t.id); t.apply(); toast(`Researched: ${t.name}`); beep(760,0.05,0.03);}
 
-  // CORE GAIN: current bits only (not lifetime)
-  function coreGain(){
-    return Math.floor(Math.sqrt(state.bits / 1e6));
-  }
-
-  // Ascend resets research + multipliers
+  // CORE GAIN
+  function coreGain(){ return Math.floor(Math.sqrt(state.bits / 1e6)); }
   function tryAscend(){
     const gain = coreGain();
     if (gain <= 0) { toast('Generate more Bits to ascend'); return; }
-
     state.ascend.cores += gain;
     state.ascend.best = Math.max(state.ascend.best, state.ascend.cores);
-
-    state.bits = 0;
-    state.bitsTotal = 0;
-    state.clickBase = 1;
-    state.clickMult = 1;
+    state.bits = 0; state.bitsTotal = 0; state.clickBase = 1; state.clickMult = 1;
     state.modules = MODULES.map(m => ({id: m.id, count: 0}));
-    state.upgrades = [];
-    state.rp = 0;
-
-    // reset research
-    state.tech = [];
-    // restore multipliers/modifiers defaults
+    state.upgrades = []; state.rp = 0; state.tech = [];
     mults.global = 1; mults.modules = 1; mults.glitch = 1; mults.combo = 1;
-    Object.assign(mods, {
-      clickCurve: 1, rpGain: 1, arcadeReward: 1, riftHP: 1, gateZone: 1,
-      pulseSize: 1, pulseLife: 1, costMult: 1, glitchRate: 1, riftReward: 1
-    });
-    // restore state influenced by tech
-    state.charge = {active:false, t:0, tMax:1.6};
-    state.critZone = {lo:0.92, hi:1.0, mult:3};
-    state.combo = {v:0, max:0.5, decay:0.12};
-
-    // misc reset
+    Object.assign(mods, {clickCurve:1,rpGain:1,arcadeReward:1,riftHP:1,gateZone:1,pulseSize:1,pulseLife:1,costMult:1,glitchRate:1,riftReward:1});
+    state.charge = {active:false, t:0, tMax:1.6}; state.critZone = {lo:0.92, hi:1.0, mult:3}; state.combo = {v:0,max:0.5,decay:0.12};
     state.glitch = {next:rand(18,40), life:0, x:0, y:0, active:false, value:0};
-
     toast(`Ascended: +${gain} core(s) → global x${(1 + state.ascend.cores*0.1).toFixed(2)}`);
-    beep(880, 0.07, 0.03);
-    save();
+    beep(880, 0.07, 0.03); save();
   }
 
   function updateGlitch(dt){
@@ -408,7 +394,6 @@
     let ty=by+pad; for(const t of lines){CTX.fillText(t,bx+pad,ty); ty+=fs+4*DPR;}
   }
   function toast(msg){state.toast.push({msg,t:2.6});}
-
   function particleBurst(x,y,n=12,color='#9be5ff'){for(let i=0;i<n;i++){state.particles.push({x,y,vx:rand(-120,120),vy:rand(-180,-40),life:rand(0.4,0.9),age:0,color});}}
   function updateParticles(dt){for(let i=state.particles.length-1;i>=0;i--){const p=state.particles[i];p.age+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=220*dt;if(p.age>p.life)state.particles.splice(i,1);}}
   function drawParticles(){for(const p of state.particles){const t=1-p.age/p.life;CTX.globalAlpha=Math.max(0,t);CTX.fillStyle=p.color;CTX.fillRect(p.x,p.y,3*DPR,3*DPR);CTX.globalAlpha=1;}}
@@ -425,7 +410,7 @@
       }else{
         const base=clickValueFromCharge();
         const q=state.charge.t/state.charge.tMax; const inCrit=q>=state.critZone.lo&&q<=state.critZone.hi; const val=base*(inCrit?state.critZone.mult:1);
-        addBits(val); particleBurst(input.mx,input.my,inCrit?18:10,inCrit?'#9be5ff':'#c7d2fe'); beep(inCrit?820:520,inCrit?0.06:0.03,0.03);
+        addBits(val); particleBurst(input.mx,input.my,inCrit?18:10,inCrit?'#9be5ff':'#c7d2fe'); beep(inCrit?820:520,inCrit?0.06:0.03);
         state.combo.v=clamp(state.combo.v+q*0.12,0,state.combo.max);
         addRP(q*0.4*mods.rpGain);
         state.charge.active=false; state.charge.t=0;
@@ -434,28 +419,7 @@
     if(!input.down){state.charge.active=false;}
   }
 
-  // ===== Arcade (Pulse / Gate / Meteor only) =====
-  function startPulseRush(){
-    state.arcade.active=true; state.arcade.mode='pulse'; state.arcade.t=25; state.arcade.score=0; state.arcade.pulses=[];
-    state.arcade.pulse={spawn:0.65,life:2.4*mods.pulseLife,rMin:22*mods.pulseSize,rMax:42*mods.pulseSize,maxOnScreen:8};
-    toast('Pulse Rush: click the orbs!');
-  }
-  function startGate(){
-    state.arcade.active=true; state.arcade.mode='gate'; state.arcade.t=30; state.arcade.score=0;
-    const w=0.10*mods.gateZone; state.arcade.gate={x:0.0,v:0.9,zone:[0.5-w/2,0.5+w/2],tries:8}; toast('Timing Gate: press Space or click');
-  }
-  function startMeteor(){
-    state.arcade.active=true; state.arcade.mode='meteor'; state.arcade.t=28; state.arcade.score=0;
-    const speed=300*DPR;
-    state.arcade.meteor={
-      px:CANVAS.width/2, py:CANVAS.height*0.65, r:14*DPR,
-      rocks:[], comets:[], mines:[], shards:[], beams:[], stars:[],
-      spawn:{rock:7.5, comet:1.0, mine:1.2, beam:0.45, star:0.55},
-      speed
-    };
-    toast('Meteor Dodge+: dodge meteors, shards & lasers.');
-  }
-
+  // ===== Arcade (Pulse / Gate / Meteor only) ===== (unchanged from original)
   function updateArcade(dt){
     if(!state.arcade.active) return;
     const A=state.arcade; A.t-=dt; if(A.t<=0){endArcade();return;}
@@ -494,26 +458,7 @@
       for(let i=M.stars.length-1;i>=0;i--){const k=M.stars[i]; if(hitCircle(k.x,k.y,k.r)){ A.score+=3; addRP(0.5*mods.rpGain); beep(900,0.03,0.02,'triangle'); particleBurst(k.x,k.y,6,'#a7f3d0'); M.stars.splice(i,1);}}
     }
   }
-  function spawnBeam(M){
-    const horizontal=Math.random()<0.5;
-    if(horizontal){
-      const y=rand(120*DPR, CANVAS.height-120*DPR);
-      M.beams.push({dir:'h',pos:y,phase:'warn',t:0.75,fire:1.00,th:26*DPR});
-    }else{
-      const x=rand(80*DPR, CANVAS.width-80*DPR);
-      M.beams.push({dir:'v',pos:x,phase:'warn',t:0.75,fire:1.00,th:26*DPR});
-    }
-  }
-  function endArcade(){
-    if(!state.arcade.active) return;
-    const s=Math.max(0,Math.floor(state.arcade.score)); const mode=state.arcade.mode; state.arcade.active=false;
-    let bits=0,rp=0;
-    if(mode==='pulse'){bits=s*3;rp=s*0.3;}
-    else if(mode==='gate'){bits=s*8;rp=s*0.6;}
-    else if(mode==='meteor'){bits=s*6;rp=s*0.45;}
-    bits*=mods.arcadeReward; rp*=mods.arcadeReward;
-    if(bits||rp){addBits(bits);addRP(rp);toast(`Arcade reward: +${fmt(bits)} bits, +${fmt(rp)} RP`);}
-  }
+
   function drawArcade(){
     if(!state.arcade.active) return;
     const A=state.arcade;
@@ -558,77 +503,235 @@
     }
   }
 
-  function drawResearchList(tree){
-    const items = tree.items.slice().sort((a,b)=> (a.tier-b.tier) || a.rp-b.rp );
-    const listX=state.ui.sideRect.x, listY=state.ui.sideRect.y, listW=state.ui.sideRect.w;
-    let y=listY - (state.scroll[state.tab]||0) + 44*DPR; // push below category tabs
+  function startPulseRush(){
+    state.arcade.active=true; state.arcade.mode='pulse'; state.arcade.t=25; state.arcade.score=0; state.arcade.pulses=[];
+    state.arcade.pulse={spawn:0.65,life:2.4*mods.pulseLife,rMin:22*mods.pulseSize,rMax:42*mods.pulseSize,maxOnScreen:8};
+    toast('Pulse Rush: click the orbs!');
+  }
+  function startGate(){
+    state.arcade.active=true; state.arcade.mode='gate'; state.arcade.t=30; state.arcade.score=0;
+    const w=0.10*mods.gateZone; state.arcade.gate={x:0.0,v:0.9,zone:[0.5-w/2,0.5+w/2],tries:8}; toast('Timing Gate: press Space or click');
+  }
+  function startMeteor(){
+    state.arcade.active=true; state.arcade.mode='meteor'; state.arcade.t=28; state.arcade.score=0;
+    const speed=300*DPR;
+    state.arcade.meteor={
+      px:CANVAS.width/2, py:CANVAS.height*0.65, r:14*DPR,
+      rocks:[], comets:[], mines:[], shards:[], beams:[], stars:[],
+      spawn:{rock:7.5, comet:1.0, mine:1.2, beam:0.45, star:0.55},
+      speed
+    };
+    toast('Meteor Dodge+: dodge meteors, shards & lasers.');
+  }
+  function spawnBeam(M){
+    const horizontal=Math.random()<0.5;
+    if(horizontal){
+      const y=rand(120*DPR, CANVAS.height-120*DPR);
+      M.beams.push({dir:'h',pos:y,phase:'warn',t:0.75,fire:1.00,th:26*DPR});
+    }else{
+      const x=rand(80*DPR, CANVAS.width-80*DPR);
+      M.beams.push({dir:'v',pos:x,phase:'warn',t:0.75,fire:1.00,th:26*DPR});
+    }
+  }
+  function endArcade(){
+    if(!state.arcade.active) return;
+    const s=Math.max(0,Math.floor(state.arcade.score)); const mode=state.arcade.mode; state.arcade.active=false;
+    let bits=0,rp=0;
+    if(mode==='pulse'){bits=s*3;rp=s*0.3;}
+    else if(mode==='gate'){bits=s*8;rp=s*0.6;}
+    else if(mode==='meteor'){bits=s*6;rp=s*0.45;}
+    bits*=mods.arcadeReward; rp*=mods.arcadeReward;
+    if(bits||rp){addBits(bits);addRP(rp);toast(`Arcade reward: +${fmt(bits)} bits, +${fmt(rp)} RP`);}
+  }
 
-    // category tabs
+  // ===== Vertical Research Overlay with Spherical Nodes =====
+  function openResearch(){ state.overlay.researchOpen=true; }
+  function drawResearch(){
+    const clicksStart=clicks.length;
+    CTX.globalAlpha=0.95; CTX.fillStyle='#05070a'; CTX.fillRect(0,0,CANVAS.width,CANVAS.height); CTX.globalAlpha=1;
+    // Underlay click-catcher (added first so real UI sits on top)
+    addClick(0,0,CANVAS.width,CANVAS.height,()=>{});
+
+    const pad=20*DPR, headerH=60*DPR;
+    CTX.fillStyle='#0f141a'; roundRect(pad,pad,CANVAS.width-pad*2,headerH,14*DPR,true,false);
+    CTX.fillStyle='#e6eef6'; CTX.font=`800 ${18*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle';
+    CTX.fillText('Research Tree', pad*2, pad+headerH/2);
+    // tabs
     const cats=TREES.map(t=>t.name);
-    const tabW = Math.max(88*DPR, (listW-20*DPR)/cats.length);
-    let tx=listX+10*DPR, ty=listY+6*DPR, th=28*DPR;
+    const tabW=Math.max(90*DPR,Math.min(140*DPR,(CANVAS.width-2*pad-200*DPR)/cats.length));
+    let tx=CANVAS.width - pad - (tabW+6*DPR)*cats.length, ty=pad+headerH/2-16*DPR, th=32*DPR;
     for(let i=0;i<cats.length;i++){
       const active=(i===state.researchCat);
       CTX.fillStyle=active?'#1a222b':'#0f141a'; roundRect(tx,ty,tabW,th,8*DPR,true,false);
-      CTX.fillStyle=active?'#e2ebf5':'#9fb0c6'; CTX.font=`700 ${11*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle';
+      CTX.fillStyle=active?'#e2ebf5':'#9fb0c6'; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle';
       CTX.fillText(cats[i],tx+tabW/2,ty+th/2);
-      addClick(tx,ty,tabW,th,()=>{ state.researchCat=i; state.scroll.Research=0; });
+      addClick(tx,ty,tabW,th,()=>{ state.researchCat=i; });
       tx+=tabW+6*DPR;
     }
+    // close
+    const cbw=90*DPR, cbh=34*DPR, cbx=pad*2+220*DPR, cby=pad+headerH/2-cbh/2;
+    drawButton(cbx,cby,cbw,cbh,'Close (Esc)',true,true);
+    addClick(cbx,cby,cbw,cbh,()=>{state.overlay.researchOpen=false;});
 
-    for(const t of items){
-      const rowH=56*DPR; CTX.fillStyle='#121821'; roundRect(listX+10*DPR,y,listW-20*DPR,rowH,10*DPR,true,false);
-      const owned=hasTech(t.id); const can=state.rp>=t.rp && techAvailable(t);
-      CTX.fillStyle=owned?'#c8f7da':'#e6eef6'; CTX.font=`700 ${14*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top';
-      CTX.fillText(`${t.name} — ${t.rp} RP`,listX+22*DPR,y+10*DPR);
-      CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR}px Inter`; CTX.fillText(t.desc,listX+22*DPR,y+28*DPR);
-      const bw=96*DPR,bh=28*DPR; const bx=listX+listW-bw-22*DPR, by=y+rowH-bh-12*DPR;
-      drawButton(bx,by,bw,bh, owned?'Owned':'Research', can, true);
-      if(can) addClick(bx,by,bw,bh,()=>buyTech(t));
-      y+=rowH+8*DPR;
+    const areaX=pad, areaY=pad*2+headerH, areaW=CANVAS.width-pad*2, areaH=CANVAS.height-areaY-pad;
+    CTX.fillStyle='#0b1016'; roundRect(areaX,areaY,areaW,areaH,16*DPR,true,false);
+
+    const tree=TREES[state.researchCat];
+    const items=tree.items.slice();
+    const tiers=[...new Set(items.map(i=>i.tier))].sort((a,b)=>a-b);
+    const tierGap = 160*DPR;
+    const rowGap  = 180*DPR;
+    const leftPad = areaX + 80*DPR;
+    const topPad  = areaY + 80*DPR - (state.scrollY||0);
+
+    const byTier={}; for(const t of items){ (byTier[t.tier]||(byTier[t.tier]=[])).push(t); }
+    for(const k in byTier){ byTier[k].sort((a,b)=> a.rp-b.rp || a.name.localeCompare(b.name)); }
+
+    const pos={};
+    for(let ti=0; ti<tiers.length; ti++){
+      const t=tiers[ti];
+      const arr=byTier[t];
+      const totalWidth=(arr.length-1)*rowGap;
+      const startX = leftPad + (areaW-160*DPR - totalWidth)/2;
+      const y = topPad + ti * tierGap;
+      for(let i=0;i<arr.length;i++){
+        const x = startX + i*rowGap;
+        pos[arr[i].id] = {x,y};
+      }
+      CTX.fillStyle='#233245'; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='left'; CTX.fillText(`Tier ${t}`, areaX+16*DPR, y+5*DPR);
+      CTX.globalAlpha=0.15; CTX.strokeStyle='#294055'; CTX.beginPath(); CTX.moveTo(areaX+12*DPR,y+40*DPR); CTX.lineTo(areaX+areaW-12*DPR,y+40*DPR); CTX.stroke(); CTX.globalAlpha=1;
     }
-    // set max scroll
-    const listH=state.ui.sideRect.h;
-    state.ui.maxScroll=Math.max(0,(y-(listY+listH)));
+
+    
+    // --- compute dynamic scroll bounds for overlay ---
+    let lastTierY = 0;
+    for (const t of tiers) { lastTierY = Math.max(lastTierY, (topPad + t * tierGap)); }
+    const contentBottom = lastTierY + 220*DPR; // room for nodes/labels
+    const maxScrollY = Math.max(0, contentBottom - (areaY + areaH - 80*DPR));
+    state.researchMaxY = maxScrollY;
+    state.scrollY = clamp((state.scrollY||0), 0, state.researchMaxY);
+// edges
+    CTX.lineWidth=2*DPR;
+    for(const t of items){
+      for(const p of (t.pre||[])){
+        const a=pos[p], b=pos[t.id]; if(!a||!b) continue;
+        const owned=hasTech(p);
+        CTX.strokeStyle= owned ? '#2b7a3f' : '#37485c';
+        CTX.beginPath();
+        CTX.moveTo(a.x, a.y+40*DPR);
+        CTX.bezierCurveTo(a.x, a.y+90*DPR, b.x, b.y-90*DPR, b.x, b.y);
+        CTX.stroke();
+      }
+    }
+
+    // nodes
+    for(const t of items){
+      const p=pos[t.id]; if(!p) continue;
+      const owned=hasTech(t.id);
+      const can=state.rp>=t.rp && techAvailable(t);
+      const R=34*DPR;
+      CTX.save();
+      CTX.shadowBlur=can?18*DPR:10*DPR;
+      CTX.shadowColor=owned?'#6ee7b7':(can?'#60a5fa':'#1f2937');
+      CTX.fillStyle= owned ? '#14211a' : (can ? '#1a222b' : '#121821');
+      CTX.beginPath(); CTX.arc(p.x, p.y, R, 0, Math.PI*2); CTX.fill(); CTX.restore();
+      CTX.lineWidth=3*DPR; CTX.strokeStyle= owned ? '#6ee7b7' : (can ? '#93c5fd' : '#3b4a5c');
+      CTX.beginPath(); CTX.arc(p.x, p.y, R+2*DPR, 0, Math.PI*2); CTX.stroke();
+      CTX.fillStyle= owned ? '#c8f7da' : '#e6eef6';
+      CTX.font=`800 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle';
+      const label=t.name.length>18? t.name.slice(0,16)+'…' : t.name;
+      CTX.fillText(label, p.x, p.y-2*DPR);
+      CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${11*DPR}px Inter`;
+      CTX.fillText(`${t.rp} RP`, p.x, p.y+14*DPR);
+      const box=28*DPR;
+      addClick(p.x-box, p.y-box, box*2, box*2, ()=>{ if(can) buyTech(t); });
+      if( (input.mx-p.x)**2 + (input.my-p.y)**2 <= (R+8*DPR)**2 ){
+        const reqs=(t.pre||[]).map(id=>techById(id)?.name||id);
+        const lines=[t.name, `${t.rp} RP`, t.desc].concat(reqs.length?['Requires: '+reqs.join(', ')] : []);
+        tooltip(p.x+R+10*DPR, p.y-R, lines);
+      }
+    }
+
+    CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${12*DPR}px Inter`;
+    CTX.textAlign='left'; CTX.fillText(`RP: ${fmt(state.rp)}`, areaX+12*DPR, areaY+22*DPR);
+    CTX.textAlign='right'; CTX.fillText('Click a sphere to research • Scroll to pan', areaX+areaW-12*DPR, areaY+22*DPR);
+
+    if(Math.abs(input.wheel)>0.1){ state.scrollY = clamp((state.scrollY||0) + input.wheel*0.6, 0, (state.researchMaxY||2000*DPR)); input.wheel=0; }
+
+    // block clicks falling through
+}
+
+  function dispatchClick(px,py){
+    if(state.rift.active&&tryClickRift(px,py)) return;
+    for(let i=clicks.length-1;i>=0;i--){const c=clicks[i]; if(hit(px,py,c)){c.onClick(px,py); return;}}
+    if(tryClickGlitch(px,py)) return;
   }
 
-  // ===== Cheats =====
-  function unlockCheats(){ 
-    if(state.cheat.unlocked) return;
-    state.cheat.unlocked = true; 
-    toast('Dev menu unlocked');
-    beep(1200,0.05,0.03,'square');
-    save();
+  // ===== Encrypted Export / Import / Reset =====
+  const enc = new TextEncoder(); const dec = new TextDecoder();
+  function b64ab(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+  function abB64(str){ const bin=atob(str); const out=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out.buffer; }
+  async function deriveKey(password, salt){
+    const keyMat = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+    return await crypto.subtle.deriveKey({name:'PBKDF2', hash:'SHA-256', salt, iterations:100000}, keyMat, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
   }
-  function cheatAddBits(n){ addBits(n); toast(`+${fmt(n)} bits`); }
-  function cheatAddRP(n){ addRP(n); toast(`+${fmt(n)} RP`); }
-  function cheatAddCores(n){
-    state.ascend.cores = Math.max(0, (state.ascend.cores||0) + n);
-    state.ascend.best  = Math.max(state.ascend.best, state.ascend.cores);
-    toast(`Cores: ${state.ascend.cores}`);
+  async function doExport(){
+    try{
+      const pwd = prompt('Set a password to encrypt your save file:');
+      if(!pwd){ toast('Export cancelled'); return; }
+      const data={...state,mults,mods};
+      const plain = enc.encode(JSON.stringify(data));
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv   = crypto.getRandomValues(new Uint8Array(12));
+      const key  = await deriveKey(pwd, salt);
+      const cipher = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, plain);
+      const wrapper = { v:1, algo:'AES-GCM', kdf:'PBKDF2-SHA256', it:100000, salt:b64ab(salt), iv:b64ab(iv), cipher:b64ab(cipher) };
+      const blob = new Blob([JSON.stringify(wrapper)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'quantum_forge_save.qfs';
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('Encrypted save exported');
+    }catch(e){ console.error(e); toast('Export failed'); }
   }
-  function cheatToggleX10(){
-    if(!state.cheat.x10){ mults.global *= 10; state.cheat.x10 = true; toast('Global x10 ON'); }
-    else { mults.global /= 10; state.cheat.x10 = false; toast('Global x10 OFF'); }
+  async function doImport(){
+    return new Promise((resolve)=>{
+      FILE_IN.onchange=async ()=>{
+        const file = FILE_IN.files[0]; FILE_IN.value='';
+        if(!file){ toast('No file selected'); resolve(); return; }
+        try{
+          const txt = await file.text();
+          let wrapper; try{ wrapper = JSON.parse(txt); }catch{ wrapper=null; }
+          if(wrapper && wrapper.v===1 && wrapper.cipher && wrapper.salt && wrapper.iv){
+            const pwd = prompt('Enter password to decrypt:');
+            if(!pwd){ toast('Import cancelled'); resolve(); return; }
+            const salt = abB64(wrapper.salt);
+            const iv   = abB64(wrapper.iv);
+            const key  = await deriveKey(pwd, salt);
+            const plainBuf = await crypto.subtle.decrypt({name:'AES-GCM', iv:new Uint8Array(iv)}, key, abB64(wrapper.cipher));
+            const json = dec.decode(plainBuf);
+            state._suspendSaves = true;
+            localStorage.setItem(SAVE_KEY, json);
+          }else{
+            state._suspendSaves = true;
+            localStorage.setItem(SAVE_KEY, txt);
+          }
+          toast('Imported. Reloading…');
+          setTimeout(()=>{ state._suspendSaves = true; location.replace(location.href); }, 300);
+          resolve();
+        }catch(e){ console.error(e); toast('Import failed'); resolve(); }
+      };
+      FILE_IN.click();
+    });
   }
-  function cheatUnlockAll(){
-    for(const t of TECH){ if(!hasTech(t.id)){ state.tech.push(t.id); t.apply(); } }
-    toast('All research unlocked');
-  }
-  function cheatSpawnRift(){ if(!state.rift.active){ state.rift.timer = 0; } }
-  function cheatMaxModules(cnt=100){
-    for(const m of MODULES){ state.modules[m.id].count = cnt; }
-    toast(`All modules set to ${cnt}`);
+  function resetProgress(){
+    if(confirm('Reset ALL progress? This cannot be undone.')){
+      try{ state._suspendSaves = true; localStorage.removeItem(SAVE_KEY); }catch{}
+      toast('Progress reset. Reloading…'); setTimeout(()=>{ state._suspendSaves = true; location.replace(location.href); }, 250);
+    }
   }
 
-  function gateStop(){
-    const A=state.arcade; if(!A.active||A.mode!=='gate'||A.gate.tries<=0) return; const g=A.gate; A.gate.tries--;
-    const inside=(g.x>=g.zone[0]&&g.x<=g.zone[1]);
-    if(inside){A.score++;const mid=(g.zone[0]+g.zone[1])/2;if(Math.abs(g.x-mid)<=(g.zone[1]-g.zone[0])*0.15){A.score++;toast('Perfect! +Bonus');}addRP(1.2*mods.rpGain);addBits(8);beep(880,0.05,0.02,'sine');}
-    else{beep(260,0.05,0.02,'sine');}
-    if(A.gate.tries<=0) endArcade();
-  }
-
+  // ===== Main update/draw =====
   function update(dt){
     addBits(totalPPS()*dt); addRP(rpPerSec()*dt);
     state.combo.v=clamp(state.combo.v-state.combo.decay*dt,0,state.combo.max);
@@ -708,7 +811,7 @@
 
       const listX=sideX+10*DPR, listY=sideY+tabH+10*DPR, listW=sidebarW-20*DPR, listH=sideH-tabH-20*DPR;
       CTX.save(); CTX.beginPath(); CTX.rect(listX,listY,listW,listH); CTX.clip();
-      state.ui.sideRect={x:listX,y:listY,w:listW,h:listH};
+      state.ui.sideRect = {"x": listX, "y": listY, "w": listW, "h": listH};
       let sOff=state.scroll[state.tab]||0; let y=listY - sOff;
 
       if(state.tab==='Forge'){
@@ -754,7 +857,14 @@
       }
 
       if(state.tab==='Research'){
-        drawResearchList(TREES[state.researchCat]);
+        const rowH=60*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false);
+        CTX.fillStyle='#e6eef6'; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle';
+        CTX.fillText('Open Research Tree', listX+14*DPR, y+rowH/2);
+        const bw=180*DPR,bh=34*DPR; const bx=listX+listW-bw-12*DPR, by=y+rowH/2-bh/2;
+        drawButton(bx,by,bw,bh,'Open Tree',true,true); addClick(bx,by,bw,bh,openResearch);
+        y+=rowH+10*DPR;
+        // (Optionally list owned tech)
+        CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${12*DPR}px Inter`; CTX.fillText(`Owned: ${state.tech.length} • RP: ${fmt(state.rp)}`,listX+12*DPR,y+14*DPR);
       }
 
       if(state.tab==='Arcade'){
@@ -792,23 +902,23 @@
       }
 
       if(state.tab==='Settings'){
-        const items=[['Particles','particles'],['Low FX','lowFX'],['Mute (M)','mute'],['Export (E)','export'],['Import (I)','import']];
+        const items=[['Particles','particles'],['Low FX','lowFX'],['Mute (M)','mute'],['Export (E)','export'],['Import (I)','import'],['Reset Progress','reset']];
         for(const it of items){
           const rowH=44*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,8*DPR,true,false);
           CTX.fillStyle='#e8f0f8'; CTX.font=`700 ${13*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(it[0],listX+12*DPR,y+rowH/2);
           const bw=110*DPR,bh=30*DPR; const bx=listX+listW-bw-12*DPR, by=y+rowH/2-bh/2;
           if(it[1]==='export'){drawButton(bx,by,bw,bh,'Export',true,true);addClick(bx,by,bw,bh,()=>doExport());}
           else if(it[1]==='import'){drawButton(bx,by,bw,bh,'Import',true,true);addClick(bx,by,bw,bh,()=>doImport());}
+          else if(it[1]==='reset'){drawButton(bx,by,bw,bh,'Reset',true,true);addClick(bx,by,bw,bh,resetProgress);}
           else{
             const key=it[1]; const val=state.settings[key];
             drawButton(bx,by,bw,bh,val?'ON':'OFF',true,val);
             addClick(bx,by,bw,bh,()=>{
               state.settings[key]=!state.settings[key];
-              // secret unlock via spamming Particles toggle
               if(key==='particles'){
                 state.cheat.taps = (state.cheat.taps||0) + 1;
                 if(!state.cheat.unlocked && state.cheat.taps >= (state.cheat.req||50)){
-                  unlockCheats();
+                  state.cheat.unlocked = true; toast('Dev menu unlocked'); beep(1200,0.05,0.03,'square'); save();
                 }
               }
             });
@@ -832,6 +942,13 @@
           CTX.fillText(desc, bx+bw+14*DPR*us, y+rowH/2);
           y+=rowH+10*DPR*us;
         }
+        const cheatAddBits=(n)=>{ addBits(n); toast(`+${fmt(n)} bits`); };
+        const cheatAddRP=(n)=>{ addRP(n); toast(`+${fmt(n)} RP`); };
+        const cheatAddCores=(n)=>{ state.ascend.cores=Math.max(0,(state.ascend.cores||0)+n); state.ascend.best=Math.max(state.ascend.best,state.ascend.cores); toast(`Cores: ${state.ascend.cores}`); };
+        const cheatToggleX10=()=>{ if(!state.cheat.x10){ mults.global *= 10; state.cheat.x10 = true; toast('Global x10 ON'); } else { mults.global /= 10; state.cheat.x10 = false; toast('Global x10 OFF'); } };
+        const cheatUnlockAll=()=>{ for(const t of TECH){ if(!hasTech(t.id)){ state.tech.push(t.id); t.apply(); } } toast('All research unlocked'); };
+        const cheatSpawnRift=()=>{ if(!state.rift.active){ state.rift.timer = 0; } };
+        const cheatMaxModules=(cnt=100)=>{ for(const m of MODULES){ state.modules[m.id].count = cnt; } toast(`All modules set to ${cnt}`); };
         row('+10K Bits','Quick cash', ()=>cheatAddBits(1e4));
         row('+1M Bits','Bigger boost', ()=>cheatAddBits(1e6));
         row('+100 RP','Research points', ()=>cheatAddRP(100));
@@ -861,17 +978,11 @@
       }
     }
 
-    drawParticles(); drawArcade(); drawToasts();
+    drawParticles();
+    drawArcade();
+    if(state.overlay.researchOpen){ drawResearch(); }
+    drawToasts();
   }
-
-  function dispatchClick(px,py){
-    if(state.rift.active&&tryClickRift(px,py)) return;
-    for(let i=clicks.length-1;i>=0;i--){const c=clicks[i]; if(hit(px,py,c)){c.onClick(px,py); return;}}
-    if(tryClickGlitch(px,py)) return;
-  }
-
-  function doExport(){try{const data=localStorage.getItem(SAVE_KEY)||JSON.stringify({...state,mults,mods}); if(navigator.clipboard&&location.protocol!=='file:'){navigator.clipboard.writeText(data).then(()=>toast('Save copied')).catch(()=>alert(data));}else alert(data);}catch{toast('Export failed');}}
-  function doImport(){const data=prompt('Paste your save data:'); if(!data)return; try{localStorage.setItem(SAVE_KEY,data);toast('Imported. Reloading…');setTimeout(()=>location.reload(),400);}catch{toast('Import failed');}}
 
   let saveAcc=0; function autoSave(dt){saveAcc+=dt;if(saveAcc>10){saveAcc=0;save();}}
   let last=nowMs(); function loop(){resize();const t=nowMs();let dt=(t-last)/1000;last=t;dt=clamp(dt,0,0.1);if(state.settings.lowFX)dt*=0.9;update(dt);draw(dt);autoSave(dt);prevDown=input.down;requestAnimationFrame(loop);} loop();
