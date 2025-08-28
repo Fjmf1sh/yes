@@ -23,6 +23,21 @@
   let DPR=Math.max(1,Math.min(3,(window.devicePixelRatio||1)));
   let prevDown=false;
 
+  const THEME={
+    bgTop:'#070b11',
+    bgBot:'#0a0f17',
+    panel:'#0b1117',
+    panel2:'#101826',
+    text:'#e6eef6',
+    sub:'#9fb0c6',
+    accent:'#7de2ff',
+    accent2:'#a78bfa',
+    accent3:'#22d3ee',
+    good:'#34d399',
+    warn:'#f59e0b',
+    bad:'#ef4444'
+  };
+
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const lerp=(a,b,t)=>a+(b-a)*t;
   const nowMs=()=>performance.now();
@@ -42,7 +57,7 @@
 
   const input={mx:0,my:0,down:false,wheel:0};
   function canvasPos(evt){const r=CANVAS.getBoundingClientRect();return {x:(evt.clientX-r.left)*DPR,y:(evt.clientY-r.top)*DPR};}
-    function onPointerMove(e){
+  function onPointerMove(e){
     const p=canvasPos(e); input.mx=p.x; input.my=p.y;
     const dr=state.ui.scrollDrag;
     if(dr.active){
@@ -86,7 +101,7 @@
     }
     dispatchClick(p.x,p.y);
   }
-CANVAS.addEventListener('pointermove',onPointerMove);
+  CANVAS.addEventListener('pointermove',onPointerMove);
   CANVAS.addEventListener('pointerdown',onPointerDown);
   CANVAS.addEventListener('pointerup',onPointerUp);
   CANVAS.addEventListener('wheel',e=>{input.wheel+=e.deltaY;},{passive:true});
@@ -109,8 +124,7 @@ CANVAS.addEventListener('pointermove',onPointerMove);
 
   let AC=null; function beep(f=420,d=0.05,v=0.02,type='triangle'){ if(state.settings.mute) return; try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(),g=AC.createGain(); o.type=type;o.frequency.value=f;g.gain.value=v;o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d);}catch{} }
 
-  // ===== SHOP =====
- const MODULES=[
+  const MODULES=[
    {id:0, name:'Nanite Swarm', base:20, mult:1.15, prod:0.14},
    {id:1, name:'Signal Printer', base:130, mult:1.15, prod:1.5},
    {id:2, name:'Research Lab', base:500, mult:1.15, prod:0.005, rp:0.01},
@@ -141,11 +155,10 @@ CANVAS.addEventListener('pointermove',onPointerMove);
    {id:27, name:'Dark-Matter Mill', base:7.5e25, mult:1.15, prod:2.5e13},
    {id:28, name:'Eternity Spire', base:4e26, mult:1.15, prod:7e13},
    {id:29, name:'Chrono Array', base:2e27, mult:1.15, prod:1.8e14, rp:0.25}
-];
-
+  ];
 
   const state={
-    __version:12,
+    __version:13,
     bits:0,bitsTotal:0,lifetimeBits:0,
     rp:0,rpTotal:0,
     clickBase:1,clickMult:1,
@@ -164,7 +177,7 @@ CANVAS.addEventListener('pointermove',onPointerMove);
     glitch:{next:rand(18,40),life:0,x:0,y:0,active:false,value:0},
     rift:{timer:rand(140,220),active:false,hp:0,hpMax:0,bitsReward:0,rpReward:0,prize:'bits',ttl:0,open:0,closing:false,wobble:0,stars:[]},
     particles:[],toast:[],
-    arcade:{active:false,mode:null,t:0,score:0,pulses:[],gate:{x:0,v:0.9,zone:[0.45,0.55],tries:8}},
+    arcade:{active:false,mode:null,t:0,score:0,pulses:[],gate:{x:0,v:0.9,zone:[0.45,0.55],tries:8,cooldown:0}},
     clickArea:null,
     ui:{
       drawerOpen:false,scale:1,sideRect:null,maxScroll:0,
@@ -178,7 +191,6 @@ CANVAS.addEventListener('pointermove',onPointerMove);
   const mods={clickCurve:1,rpGain:1,arcadeReward:1,riftHP:1,gateZone:1,pulseSize:1,pulseLife:1,costMult:1,glitchRate:1,riftReward:1};
   const BUY_QTY=[1,10,100,'Max'];
 
-  // ===== RESEARCH TREES (same data) =====
   const TREES=[
     {name:'Core', id:'core', items:[
       {id:'t_over1',tier:0,rp:50, pre:[],             name:'Overclock I',     desc:'+10% global',       apply:()=>{mults.global*=1.10;}},
@@ -262,9 +274,8 @@ CANVAS.addEventListener('pointermove',onPointerMove);
     }catch{ ensureDefaults(); }
   }
   function ensureDefaults(){
-state.scrollY = state.scrollY || 0;
-    state.ui = state.ui || {drawerOpen:false,scale:1,sideRect:null,maxScroll:0,scrollDrag:{active:false,lastY:0,vy:0,tab:null
-},scrollVel:0};
+    state.scrollY = state.scrollY || 0;
+    state.ui = state.ui || {drawerOpen:false,scale:1,sideRect:null,maxScroll:0,scrollDrag:{active:false,lastY:0,vy:0,tab:null},scrollVel:0};
     const byId={}; (state.modules||[]).forEach(m=>{byId[m.id]=m;});
     state.modules = MODULES.map(m => byId[m.id] ? {id:m.id,count:byId[m.id].count||0} : {id:m.id,count:0});
   }
@@ -310,7 +321,6 @@ state.scrollY = state.scrollY || 0;
   function techAvailable(t){return !hasTech(t.id)&&t.pre.every(p=>hasTech(p));}
   function buyTech(t){if(!techAvailable(t)||state.rp<t.rp)return; state.rp-=t.rp; state.tech.push(t.id); t.apply(); toast(`Researched: ${t.name}`); beep(760,0.05,0.03);}
 
-  // CORE GAIN
   function coreGain(){ return Math.floor(Math.sqrt(state.bits / 1e6)); }
   function tryAscend(){
     const gain = coreGain();
@@ -331,11 +341,28 @@ state.scrollY = state.scrollY || 0;
   function updateGlitch(dt){
     const g=state.glitch;
     if(g.active){g.life-=dt; if(g.life<=0)g.active=false;}
-    else{ g.next-=dt; if(g.next<=0){ g.active=true; g.life=10; g.x=rand(100,CANVAS.width-100); g.y=rand(120,CANVAS.height-160); g.value=(totalPPS()*rand(8,24)+clickValueFromCharge()*rand(20,60))*mults.glitch; g.next=rand(32,68)/mods.glitchRate;} }
+    else{ 
+      g.next-=dt; 
+      if(g.next<=0){ 
+        g.active=true; g.life=10; 
+        const ca = state.clickArea;
+        if(ca){
+          const ang = rand(0, Math.PI*2);
+          const rad = Math.sqrt(Math.random()) * Math.max(8*DPR, ca.R - 24*DPR);
+          g.x = ca.cx + Math.cos(ang) * rad;
+          g.y = ca.cy + Math.sin(ang) * rad;
+        }else{
+          g.x=rand(100,CANVAS.width-100); g.y=rand(120,CANVAS.height-160);
+        }
+        g.value=(totalPPS()*rand(8,24)+clickValueFromCharge()*rand(20,60))*mults.glitch; 
+        g.next=rand(32,68)/mods.glitchRate;
+        g.seed=(Math.random()*1e9)|0;
+      } 
+    }
   }
   function tryClickGlitch(px,py){
     const g=state.glitch; if(!g.active) return false;
-    const d2=(px-g.x)**2+(py-g.y)**2; if(d2<=(28*DPR)**2){ addBits(g.value); g.active=false; particleBurst(g.x,g.y,18,'#ffd54a'); toast(`Glitch +${fmt(g.value)}`); beep(1200,0.06,0.04,'sawtooth'); return true; }
+    const d2=(px-g.x)**2+(py-g.y)**2; if(d2<=(28*DPR)**2){ addBits(g.value); g.active=false; particleBurst(g.x,g.y,18,THEME.accent3); toast(`Glitch +${fmt(g.value)}`); beep(1200,0.06,0.04,'sawtooth'); return true; }
     return false;
   }
 
@@ -357,7 +384,7 @@ state.scrollY = state.scrollY || 0;
         r.bitsReward=pps*rand(80,160)*mods.riftReward;
         r.rpReward=Math.max(5,pps*0.02*rand(20,40))*mods.riftReward;
         r.prize=Math.random()<0.5?'bits':'rp';
-        r.ttl=30; r.stars.length=0; for(let i=0;i<80;i++) r.stars.push({x:Math.random(),y:Math.random(),a:rand(0.5,1)});
+        r.ttl=30; r.stars.length=0; for(let i=0;i<100;i++) r.stars.push({x:Math.random(),y:Math.random(),a:rand(0.5,1)});
         toast('A Rift tears reality! Spam click to seal it!');
       }
     }
@@ -367,7 +394,7 @@ state.scrollY = state.scrollY || 0;
     const compact=(CANVAS.width/DPR)<980;
     const sidebarW=compact?(state.ui.drawerOpen?Math.min(320*DPR,CANVAS.width-2*pad):0):Math.max(340*DPR,CANVAS.width*0.30);
     const mainX=pad, mainY=pad*2+headerH; const mainW=CANVAS.width-sidebarW-pad*3; const mainH=CANVAS.height-mainY-pad;
-    const yMid=mainY+mainH*0.45; const h=clamp(state.rift.open,0,1)*Math.max(60*DPR,mainH*0.25);
+    const yMid=mainY+mainH*0.45; const h=clamp(state.rift.open,0,1)*Math.max(60*DPR,mainH*0.28);
     return {x:mainX+12*DPR,yMid,w:mainW-24*DPR,h};
   }
   function tryClickRift(px,py){
@@ -375,7 +402,7 @@ state.scrollY = state.scrollY || 0;
     if(px>=area.x&&px<=area.x+area.w&&Math.abs(py-area.yMid)<=area.h/2){
       const dmg=Math.max(5,totalPPS()*0.8+10);
       r.hp=Math.max(0,r.hp-dmg);
-      particleBurst(px,py,6,'#ff8fa3'); beep(980,0.02,0.02,'square');
+      particleBurst(px,py,6,THEME.accent2); beep(980,0.02,0.02,'square');
       if(r.hp<=0&&!r.closing){
         r.closing=true;
         if(r.prize==='bits'){ addBits(r.bitsReward); toast(`Rift sealed! +${fmt(r.bitsReward)} bits`); }
@@ -387,10 +414,10 @@ state.scrollY = state.scrollY || 0;
   }
 
   const clicks=[]; function addClick(x,y,w,h,onClick){clicks.push({x,y,w,h,onClick});} function hit(px,py,r){return px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h;}
-  function drawButton(x,y,w,h,label,on=true,accent=false){const r=10*DPR;CTX.save();CTX.fillStyle=on?(accent?'#2f3947':'#1a212b'):'#11161d';roundRect(x,y,w,h,r,true,false);CTX.fillStyle=on?'#e6eef6':'#7f8da0';CTX.font=`700 ${14*DPR}px Inter`;CTX.textAlign='center';CTX.textBaseline='middle';CTX.fillText(label,x+w/2,y+h/2);CTX.restore();}
-  function drawBar(x,y,w,h,t,col='#4ade80'){CTX.fillStyle='#10151b';roundRect(x,y,w,h,h/2,true,false);CTX.fillStyle=col;roundRect(x,y,w*clamp(t,0,1),h,h/2,true,false);}
+  function drawButton(x,y,w,h,label,on=true,accent=false){const r=10*DPR;CTX.save();CTX.fillStyle=on?(accent?THEME.panel2:'#1a212b'):'#11161d';roundRect(x,y,w,h,r,true,false);CTX.fillStyle=on?THEME.text:'#7f8da0';CTX.font=`700 ${14*DPR}px Inter`;CTX.textAlign='center';CTX.textBaseline='middle';CTX.fillText(label,x+w/2,y+h/2);CTX.restore();}
+  function drawBar(x,y,w,h,t,col=THEME.good){CTX.fillStyle='#10151b';roundRect(x,y,w,h,h/2,true,false);CTX.fillStyle=col;roundRect(x,y,w*clamp(t,0,1),h,h/2,true,false);}
   function roundRect(x,y,w,h,r,fill,stroke){CTX.beginPath();CTX.moveTo(x+r,y);CTX.arcTo(x+w,y,x+w,y+h,r);CTX.arcTo(x+w,y+h,x,y+h,r);CTX.arcTo(x,y+h,x,y,r);CTX.arcTo(x,y,x+w,y,r);CTX.closePath();if(fill)CTX.fill();if(stroke)CTX.stroke();}
-  function pill(x,y,txt){const fs=12*DPR,pad=6*DPR,w=measure(txt,fs,'700')*DPR+pad*2,h=20*DPR;CTX.fillStyle='#141a21';roundRect(x,y,w,h,999,true,false);CTX.fillStyle='#9fb0c6';CTX.font=`700 ${fs}px Inter`;CTX.textAlign='center';CTX.textBaseline='middle';CTX.fillText(txt,x+w/2,y+h/2);return{w,h};}
+  function pill(x,y,txt){const fs=12*DPR,pad=6*DPR,w=measure(txt,fs,'700')*DPR+pad*2,h=20*DPR;CTX.fillStyle='#141a21';roundRect(x,y,w,h,999,true,false);CTX.fillStyle=THEME.sub;CTX.font=`700 ${fs}px Inter`;CTX.textAlign='center';CTX.textBaseline='middle';CTX.fillText(txt,x+w/2,y+h/2);return{w,h};}
   function tooltip(x,y,lines){
     const fs=12*DPR; const pad=8*DPR;
     const w=Math.max(...lines.map(t=>measure(t,fs,'700')))*DPR + pad*2;
@@ -400,15 +427,15 @@ state.scrollY = state.scrollY || 0;
     if(by+h>CANVAS.height-8*DPR) by = y - h - 14*DPR;
     CTX.fillStyle='#0c1117'; roundRect(bx,by,w,h,8*DPR,true,false);
     CTX.strokeStyle='#304256'; CTX.lineWidth=1*DPR; CTX.stroke();
-    CTX.fillStyle='#e6eef6'; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.font=`700 ${fs}px Inter`;
+    CTX.fillStyle=THEME.text; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.font=`700 ${fs}px Inter`;
     let ty=by+pad; for(const t of lines){CTX.fillText(t,bx+pad,ty); ty+=fs+4*DPR;}
   }
   function toast(msg){state.toast.push({msg,t:2.6});}
-  function particleBurst(x,y,n=12,color='#9be5ff'){for(let i=0;i<n;i++){state.particles.push({x,y,vx:rand(-120,120),vy:rand(-180,-40),life:rand(0.4,0.9),age:0,color});}}
+  function particleBurst(x,y,n=12,color=THEME.accent){for(let i=0;i<n;i++){state.particles.push({x,y,vx:rand(-120,120),vy:rand(-180,-40),life:rand(0.4,0.9),age:0,color});}}
   function updateParticles(dt){for(let i=state.particles.length-1;i>=0;i--){const p=state.particles[i];p.age+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=220*dt;if(p.age>p.life)state.particles.splice(i,1);}}
   function drawParticles(){for(const p of state.particles){const t=1-p.age/p.life;CTX.globalAlpha=Math.max(0,t);CTX.fillStyle=p.color;CTX.fillRect(p.x,p.y,3*DPR,3*DPR);CTX.globalAlpha=1;}}
   function updateToasts(dt){for(let i=state.toast.length-1;i>=0;i--){const t=state.toast[i];t.t-=dt;if(t.t<=0)state.toast.splice(i,1);}}
-  function drawToasts(){const fs=12*DPR;CTX.font=`700 ${fs}px Inter`;CTX.textAlign='center';let y=20*DPR;for(const t of state.toast){CTX.fillStyle='#0f141a';const w=measure(t.msg,fs,'700')*DPR+26*DPR;const h=24*DPR;const x=CANVAS.width/2-w/2;roundRect(x,y,w,h,10*DPR,true,false);CTX.fillStyle='#e6eef6';CTX.fillText(t.msg,CANVAS.width/2,y+h/2);y+=h+8*DPR;}}
+  function drawToasts(){const fs=12*DPR;CTX.font=`700 ${fs}px Inter`;CTX.textAlign='center';let y=20*DPR;for(const t of state.toast){CTX.fillStyle='#0f141a';const w=measure(t.msg,fs,'700')*DPR+26*DPR;const h=24*DPR;const x=CANVAS.width/2-w/2;roundRect(x,y,w,h,10*DPR,true,false);CTX.fillStyle=THEME.text;CTX.fillText(t.msg,CANVAS.width/2,y+h/2);y+=h+8*DPR;}}
 
   function updateCharge(dt){
     const area=state.clickArea; if(!area) return;
@@ -420,7 +447,7 @@ state.scrollY = state.scrollY || 0;
       }else{
         const base=clickValueFromCharge();
         const q=state.charge.t/state.charge.tMax; const inCrit=q>=state.critZone.lo&&q<=state.critZone.hi; const val=base*(inCrit?state.critZone.mult:1);
-        addBits(val); particleBurst(input.mx,input.my,inCrit?18:10,inCrit?'#9be5ff':'#c7d2fe'); beep(inCrit?820:520,inCrit?0.06:0.03);
+        addBits(val); particleBurst(input.mx,input.my,inCrit?18:10,inCrit?THEME.accent:THEME.accent2); beep(inCrit?820:520,inCrit?0.06:0.03);
         state.combo.v=clamp(state.combo.v+q*0.12,0,state.combo.max);
         addRP(q*0.4*mods.rpGain);
         state.charge.active=false; state.charge.t=0;
@@ -429,17 +456,24 @@ state.scrollY = state.scrollY || 0;
     if(!input.down){state.charge.active=false;}
   }
 
-  // ===== Arcade (Pulse / Gate / Meteor only) ===== (unchanged from original)
   function updateArcade(dt){
     if(!state.arcade.active) return;
     const A=state.arcade; A.t-=dt; if(A.t<=0){endArcade();return;}
 
     if(A.mode==='pulse'){
-      const conf=A.pulse; if(A.pulses.length<conf.maxOnScreen&&Math.random()<dt*conf.spawn){const life=conf.life;A.pulses.push({x:rand(120,CANVAS.width-120),y:rand(160,CANVAS.height-160),life,max:life});}
+      const conf=A.pulse; 
+      if(A.pulses.length<conf.maxOnScreen&&Math.random()<dt*conf.spawn){
+        const life=conf.life;
+        A.pulses.push({x:rand(120,CANVAS.width-120),y:rand(160,CANVAS.height-160),life,max:life});
+      }
       for(let i=A.pulses.length-1;i>=0;i--){const p=A.pulses[i];p.life-=dt;if(p.life<=0)A.pulses.splice(i,1);}
 
     }else if(A.mode==='gate'){
-      const g=A.gate; g.x+=g.v*dt; if(g.x<0){g.x=0;g.v=Math.abs(g.v);} if(g.x>1){g.x=1;g.v=-Math.abs(g.v);}
+      const g=A.gate;
+      g.cooldown=Math.max(0,g.cooldown-dt);
+      g.x+=g.v*dt; 
+      if(g.x<0){g.x=0;g.v=Math.abs(g.v);} 
+      if(g.x>1){g.x=1;g.v=-Math.abs(g.v);}
 
     }else if(A.mode==='meteor'){
       const M=A.meteor; M.px=input.mx; M.py=input.my; A.score+=dt*3.0;
@@ -474,17 +508,35 @@ state.scrollY = state.scrollY || 0;
     const A=state.arcade;
     CTX.globalAlpha=0.85;CTX.fillStyle='#000';CTX.fillRect(0,0,CANVAS.width,CANVAS.height);CTX.globalAlpha=1;
     const modeTitle={pulse:'Pulse Rush',gate:'Timing Gate',meteor:'Meteor Dodge+'}[A.mode]||'Arcade';
-    CTX.fillStyle='#e6eef6';CTX.font=`800 ${18*DPR}px Inter`;CTX.textAlign='center';CTX.fillText(`${modeTitle} — ${A.t.toFixed(1)}s`,CANVAS.width/2,60*DPR);
+    CTX.fillStyle=THEME.text;CTX.font=`800 ${18*DPR}px Inter`;CTX.textAlign='center';CTX.fillText(`${modeTitle} — ${A.t.toFixed(1)}s`,CANVAS.width/2,60*DPR);
 
     if(A.mode==='pulse'){
-      const conf=A.pulse; for(const p of A.pulses){const t=p.life/p.max; const r=lerp(conf.rMin*DPR,conf.rMax*DPR,t); CTX.globalAlpha=Math.max(0.2,t); CTX.fillStyle='#8be9fd'; CTX.beginPath(); CTX.arc(p.x,p.y,r,0,Math.PI*2); CTX.fill(); CTX.globalAlpha=1;}
-      CTX.fillStyle='#9fb0c6';CTX.font=`700 ${14*DPR}px Inter`;CTX.fillText(`Score: ${Math.floor(A.score)}`,CANVAS.width/2,90*DPR);
+      const conf=A.pulse; 
+      for(const p of A.pulses){
+        const t=p.life/p.max;
+        const r=lerp(conf.rMin*DPR,conf.rMax*DPR,t);
+        CTX.globalAlpha=Math.max(0.25,t);
+        const g=CTX.createRadialGradient(p.x,p.y,1,p.x,p.y,r);
+        g.addColorStop(0,THEME.accent);
+        g.addColorStop(1,'rgba(125,226,255,0.05)');
+        CTX.fillStyle=g; 
+        CTX.beginPath();CTX.arc(p.x,p.y,r,0,Math.PI*2);CTX.fill();
+        CTX.globalAlpha=1;
+      }
+      CTX.fillStyle=THEME.sub;CTX.font=`700 ${14*DPR}px Inter`;CTX.fillText(`Score: ${Math.floor(A.score)}`,CANVAS.width/2,90*DPR);
 
     }else if(A.mode==='gate'){
-      const cx=CANVAS.width/2,y=CANVAS.height/2,W=520*DPR,H=22*DPR; CTX.fillStyle='#121821'; roundRect(cx-W/2,y-H/2,W,H,10*DPR,true,false);
-      const [zl,zh]=A.gate.zone; CTX.fillStyle='#284b63'; roundRect(cx-W/2+W*zl,y-H/2,W*(zh-zl),H,10*DPR,true,false);
-      const mx=cx-W/2+W*A.gate.x; CTX.fillStyle='#e6eef6'; roundRect(mx-5*DPR,y-10*DPR,10*DPR,20*DPR,3*DPR,true,false);
-      CTX.fillStyle='#9fb0c6';CTX.font=`700 ${14*DPR}px Inter`; CTX.fillText(`Tries: ${A.gate.tries}  Score: ${A.score}`,cx,y+40*DPR); CTX.fillText(`Press Space OR Click the bar`,cx,y+62*DPR);
+      const cx=CANVAS.width/2,y=CANVAS.height/2,W=520*DPR,H=22*DPR; 
+      CTX.fillStyle='#121821'; roundRect(cx-W/2,y-H/2,W,H,10*DPR,true,false);
+      const [zl,zh]=A.gate.zone; 
+      const grad=CTX.createLinearGradient(cx-W/2+W*zl,y,cx-W/2+W*zh,y);
+      grad.addColorStop(0,THEME.accent3); grad.addColorStop(1,THEME.accent2);
+      CTX.fillStyle=grad; roundRect(cx-W/2+W*zl,y-H/2,W*(zh-zl),H,10*DPR,true,false);
+      const mx=cx-W/2+W*A.gate.x; 
+      CTX.fillStyle=THEME.text; roundRect(mx-5*DPR,y-10*DPR,10*DPR,20*DPR,3*DPR,true,false);
+      CTX.fillStyle=THEME.sub;CTX.font=`700 ${14*DPR}px Inter`; 
+      CTX.fillText(`Tries: ${A.gate.tries}  Score: ${Math.floor(A.score)}`,cx,y+40*DPR); 
+      CTX.fillText(`Press Space OR Click the bar`,cx,y+62*DPR);
 
     }else if(A.mode==='meteor'){
       const M=A.meteor;
@@ -508,19 +560,41 @@ state.scrollY = state.scrollY || 0;
       for(const m of M.mines){CTX.fillStyle='#2d3744';CTX.beginPath();CTX.arc(m.x,m.y,m.r,0,Math.PI*2);CTX.fill();}
       for(const s of M.shards){CTX.fillStyle='#ffb38a'; CTX.beginPath(); CTX.arc(s.x,s.y,s.r,0,Math.PI*2); CTX.fill();}
       for(const s of M.stars){CTX.fillStyle='#9be7d7';CTX.beginPath();CTX.arc(s.x,s.y,s.r,0,Math.PI*2);CTX.fill();}
-      CTX.fillStyle='#e6eef6';CTX.beginPath();CTX.arc(M.px,M.py,M.r,0,Math.PI*2);CTX.fill();
-      CTX.fillStyle='#9fb0c6';CTX.font=`700 ${14*DPR}px Inter`;CTX.fillText(`Score: ${Math.floor(A.score)}`,CANVAS.width/2,90*DPR);
+      CTX.fillStyle=THEME.text;CTX.beginPath();CTX.arc(M.px,M.py,M.r,0,Math.PI*2);CTX.fill();
+      CTX.fillStyle=THEME.sub;CTX.font=`700 ${14*DPR}px Inter`;CTX.fillText(`Score: ${Math.floor(A.score)}`,CANVAS.width/2,90*DPR);
     }
+  }
+
+  function gateStop(){
+    const A=state.arcade; if(!A.active||A.mode!=='gate')return;
+    const g=A.gate;
+    if(g.cooldown>0) return;
+    const [zl,zh]=g.zone; const center=(zl+zh)/2; const width=(zh-zl);
+    let add=0; let perfect=false;
+    if(g.x>=zl && g.x<=zh){
+      add=1;
+      if(Math.abs(g.x-center)<=width*0.12){ add=2; perfect=true; }
+      beep(perfect?880:720,perfect?0.06:0.04,0.03,perfect?'square':'triangle');
+      particleBurst(CANVAS.width/2, CANVAS.height/2, perfect?14:8, perfect?THEME.good:THEME.accent);
+    }else{
+      beep(280,0.05,0.035,'sine');
+    }
+    A.score+=add;
+    g.tries=Math.max(0,g.tries-1);
+    const speedUp=1+rand(0.04,0.10);
+    g.v = Math.sign(g.v)*Math.min(Math.abs(g.v)*speedUp, 2.2);
+    g.cooldown=0.22;
+    if(g.tries<=0) endArcade();
   }
 
   function startPulseRush(){
     state.arcade.active=true; state.arcade.mode='pulse'; state.arcade.t=25; state.arcade.score=0; state.arcade.pulses=[];
-    state.arcade.pulse={spawn:0.65,life:2.4*mods.pulseLife,rMin:22*mods.pulseSize,rMax:42*mods.pulseSize,maxOnScreen:8};
+    state.arcade.pulse={spawn:0.55,life:3.0*mods.pulseLife,rMin:28*mods.pulseSize,rMax:52*mods.pulseSize,maxOnScreen:7};
     toast('Pulse Rush: click the orbs!');
   }
   function startGate(){
     state.arcade.active=true; state.arcade.mode='gate'; state.arcade.t=30; state.arcade.score=0;
-    const w=0.10*mods.gateZone; state.arcade.gate={x:0.0,v:0.9,zone:[0.5-w/2,0.5+w/2],tries:8}; toast('Timing Gate: press Space or click');
+    const w=0.10*mods.gateZone; state.arcade.gate={x:0.0,v:0.9,zone:[0.5-w/2,0.5+w/2],tries:8,cooldown:0}; toast('Timing Gate: press Space or click');
   }
   function startMeteor(){
     state.arcade.active=true; state.arcade.mode='meteor'; state.arcade.t=28; state.arcade.score=0;
@@ -551,34 +625,30 @@ state.scrollY = state.scrollY || 0;
     else if(mode==='gate'){bits=s*8;rp=s*0.6;}
     else if(mode==='meteor'){bits=s*6;rp=s*0.45;}
     bits*=mods.arcadeReward; rp*=mods.arcadeReward;
-    if(bits||rp){addBits(bits);addRP(rp);toast(`Arcade reward: +${fmt(bits)} bits, +${fmt(rp)} RP`);}
+    if(bits||rp){addBits(bits);addRP(rp);state.arcadeLastRewarded=true;toast(`Arcade reward: +${fmt(bits)} bits, +${fmt(rp)} RP`);}
   }
 
-  // ===== Vertical Research Overlay with Spherical Nodes =====
   function openResearch(){ state.overlay.researchOpen=true; }
   function drawResearch(){
     const clicksStart=clicks.length;
     CTX.globalAlpha=0.95; CTX.fillStyle='#05070a'; CTX.fillRect(0,0,CANVAS.width,CANVAS.height); CTX.globalAlpha=1;
-    // Underlay click-catcher (added first so real UI sits on top)
     addClick(0,0,CANVAS.width,CANVAS.height,()=>{});
 
     const pad=20*DPR, headerH=60*DPR;
-    CTX.fillStyle='#0f141a'; roundRect(pad,pad,CANVAS.width-pad*2,headerH,14*DPR,true,false);
-    CTX.fillStyle='#e6eef6'; CTX.font=`800 ${18*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle';
+    CTX.fillStyle=THEME.panel; roundRect(pad,pad,CANVAS.width-pad*2,headerH,14*DPR,true,false);
+    CTX.fillStyle=THEME.text; CTX.font=`800 ${18*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle';
     CTX.fillText('Research Tree', pad*2, pad+headerH/2);
-    // tabs
     const cats=TREES.map(t=>t.name);
     const tabW=Math.max(90*DPR,Math.min(140*DPR,(CANVAS.width-2*pad-200*DPR)/cats.length));
     let tx=CANVAS.width - pad - (tabW+6*DPR)*cats.length, ty=pad+headerH/2-16*DPR, th=32*DPR;
     for(let i=0;i<cats.length;i++){
       const active=(i===state.researchCat);
-      CTX.fillStyle=active?'#1a222b':'#0f141a'; roundRect(tx,ty,tabW,th,8*DPR,true,false);
-      CTX.fillStyle=active?'#e2ebf5':'#9fb0c6'; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle';
+      CTX.fillStyle=active?THEME.panel2:THEME.panel; roundRect(tx,ty,tabW,th,8*DPR,true,false);
+      CTX.fillStyle=active?THEME.text:THEME.sub; CTX.font=`700 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle';
       CTX.fillText(cats[i],tx+tabW/2,ty+th/2);
       addClick(tx,ty,tabW,th,()=>{ state.researchCat=i; });
       tx+=tabW+6*DPR;
     }
-    // close
     const cbw=90*DPR, cbh=34*DPR, cbx=pad*2+220*DPR, cby=pad+headerH/2-cbh/2;
     drawButton(cbx,cby,cbw,cbh,'Close (Esc)',true,true);
     addClick(cbx,cby,cbw,cbh,()=>{state.overlay.researchOpen=false;});
@@ -612,15 +682,13 @@ state.scrollY = state.scrollY || 0;
       CTX.globalAlpha=0.15; CTX.strokeStyle='#294055'; CTX.beginPath(); CTX.moveTo(areaX+12*DPR,y+40*DPR); CTX.lineTo(areaX+areaW-12*DPR,y+40*DPR); CTX.stroke(); CTX.globalAlpha=1;
     }
 
-    
-    // --- compute dynamic scroll bounds for overlay ---
     let lastTierY = 0;
     for (const t of tiers) { lastTierY = Math.max(lastTierY, (topPad + t * tierGap)); }
-    const contentBottom = lastTierY + 220*DPR; // room for nodes/labels
+    const contentBottom = lastTierY + 220*DPR;
     const maxScrollY = Math.max(0, contentBottom - (areaY + areaH - 80*DPR));
     state.researchMaxY = maxScrollY;
     state.scrollY = clamp((state.scrollY||0), 0, state.researchMaxY);
-// edges
+
     CTX.lineWidth=2*DPR;
     for(const t of items){
       for(const p of (t.pre||[])){
@@ -634,7 +702,6 @@ state.scrollY = state.scrollY || 0;
       }
     }
 
-    // nodes
     for(const t of items){
       const p=pos[t.id]; if(!p) continue;
       const owned=hasTech(t.id);
@@ -642,16 +709,16 @@ state.scrollY = state.scrollY || 0;
       const R=34*DPR;
       CTX.save();
       CTX.shadowBlur=can?18*DPR:10*DPR;
-      CTX.shadowColor=owned?'#6ee7b7':(can?'#60a5fa':'#1f2937');
-      CTX.fillStyle= owned ? '#14211a' : (can ? '#1a222b' : '#121821');
+      CTX.shadowColor=owned?THEME.good:(can?THEME.accent:THEME.panel);
+      CTX.fillStyle= owned ? '#14211a' : (can ? THEME.panel2 : '#121821');
       CTX.beginPath(); CTX.arc(p.x, p.y, R, 0, Math.PI*2); CTX.fill(); CTX.restore();
-      CTX.lineWidth=3*DPR; CTX.strokeStyle= owned ? '#6ee7b7' : (can ? '#93c5fd' : '#3b4a5c');
+      CTX.lineWidth=3*DPR; CTX.strokeStyle= owned ? THEME.good : (can ? '#93c5fd' : '#3b4a5c');
       CTX.beginPath(); CTX.arc(p.x, p.y, R+2*DPR, 0, Math.PI*2); CTX.stroke();
-      CTX.fillStyle= owned ? '#c8f7da' : '#e6eef6';
+      CTX.fillStyle= owned ? '#c8f7da' : THEME.text;
       CTX.font=`800 ${12*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle';
       const label=t.name.length>18? t.name.slice(0,16)+'…' : t.name;
       CTX.fillText(label, p.x, p.y-2*DPR);
-      CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${11*DPR}px Inter`;
+      CTX.fillStyle=THEME.sub; CTX.font=`700 ${11*DPR}px Inter`;
       CTX.fillText(`${t.rp} RP`, p.x, p.y+14*DPR);
       const box=28*DPR;
       addClick(p.x-box, p.y-box, box*2, box*2, ()=>{ if(can) buyTech(t); });
@@ -662,22 +729,35 @@ state.scrollY = state.scrollY || 0;
       }
     }
 
-    CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${12*DPR}px Inter`;
+    CTX.fillStyle=THEME.sub; CTX.font=`700 ${12*DPR}px Inter`;
     CTX.textAlign='left'; CTX.fillText(`RP: ${fmt(state.rp)}`, areaX+12*DPR, areaY+22*DPR);
     CTX.textAlign='right'; CTX.fillText('Click a sphere to research • Scroll to pan', areaX+areaW-12*DPR, areaY+22*DPR);
 
     if(Math.abs(input.wheel)>0.1){ state.scrollY = clamp((state.scrollY||0) + input.wheel*0.6, 0, (state.researchMaxY||2000*DPR)); input.wheel=0; }
-
-    // block clicks falling through
-}
+  }
 
   function dispatchClick(px,py){
+    if(state.arcade.active && state.arcade.mode==='pulse'){
+      const conf=state.arcade.pulse;
+      for(let i=state.arcade.pulses.length-1;i>=0;i--){
+        const p=state.arcade.pulses[i];
+        const t=p.life/p.max;
+        const r=lerp(conf.rMin*DPR,conf.rMax*DPR,t);
+        const d2=(px-p.x)**2+(py-p.y)**2;
+        if(d2<=r*r){
+          state.arcade.score+= (t<0.35?2:1);
+          particleBurst(p.x,p.y,10, THEME.accent3);
+          beep(820,0.05,0.03,'triangle');
+          state.arcade.pulses.splice(i,1);
+          return;
+        }
+      }
+    }
     if(state.rift.active&&tryClickRift(px,py)) return;
     for(let i=clicks.length-1;i>=0;i--){const c=clicks[i]; if(hit(px,py,c)){c.onClick(px,py); return;}}
     if(tryClickGlitch(px,py)) return;
   }
 
-  // ===== Encrypted Export / Import / Reset =====
   const enc = new TextEncoder(); const dec = new TextDecoder();
   function b64ab(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
   function abB64(str){ const bin=atob(str); const out=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out.buffer; }
@@ -741,7 +821,93 @@ state.scrollY = state.scrollY || 0;
     }
   }
 
-  // ===== Main update/draw =====
+  function drawQuantumTheme(){
+    const cx=CANVAS.width/2, cy=CANVAS.height/2, r=Math.hypot(CANVAS.width, CANVAS.height)*0.6;
+    const rad=CTX.createRadialGradient(cx,cy,Math.max(10*DPR,r*0.05),cx,cy,r);
+    rad.addColorStop(0, '#0a1522');
+    rad.addColorStop(1, THEME.bgBot);
+    CTX.fillStyle=rad; CTX.fillRect(0,0,CANVAS.width,CANVAS.height);
+
+    CTX.save();
+    CTX.globalAlpha=0.06;
+    CTX.strokeStyle='#6ee7ff';
+    CTX.lineWidth=1*DPR;
+    const s=64*DPR; const t=nowMs()*0.0003;
+    CTX.beginPath();
+    for(let x=((t*30)%s)-s; x<CANVAS.width; x+=s){CTX.moveTo(x,0);CTX.lineTo(x,CANVAS.height);}
+    for(let y=((t*30)%s)-s; y<CANVAS.height; y+=s){CTX.moveTo(0,y);CTX.lineTo(CANVAS.width,y);}
+    CTX.stroke();
+    CTX.restore();
+
+    CTX.save();
+    CTX.globalAlpha=0.25;
+    CTX.strokeStyle=THEME.accent2;
+    CTX.lineWidth=2*DPR;
+    const rings=3;
+    for(let i=0;i<rings;i++){
+      const rr = r*(0.35 + 0.1*i) + Math.sin(nowMs()/1000 + i)*6*DPR;
+      CTX.beginPath(); CTX.arc(cx,cy,rr,0,Math.PI*2); CTX.stroke();
+    }
+    CTX.restore();
+  }
+
+  // ====== NEW: Proper "glitch" orb renderer (datamosh slices + chroma + pixel snow) ======
+  function drawGlitchOrb(x, y, Rg, seed){
+    const t = performance.now()/1000;
+    CTX.save();
+    CTX.translate(x, y);
+
+    const jx = (Math.sin((t*12.3 + seed)%100)*2 - 1) * 2*DPR;
+    const jy = (Math.cos((t*15.7 + seed)%100)*2 - 1) * 2*DPR;
+    CTX.translate(jx, jy);
+    CTX.rotate((Math.sin(t*6.2+seed)*0.06));
+
+    // Keep a circular silhouette
+    CTX.beginPath(); CTX.arc(0,0,Rg,0,Math.PI*2); CTX.clip();
+
+    // noisy scanline field
+    for(let i=-Rg; i<Rg; i+=3*DPR){
+      const off = (Math.sin(t*24+i*0.35)+Math.cos(t*13+i*0.57))*3*DPR;
+      CTX.fillStyle = (i%(6*DPR)===0)?'#08f7f2':'#c084fc';
+      CTX.globalAlpha = 0.75;
+      CTX.fillRect(-Rg+off, i, Rg*2, 2*DPR);
+    }
+    CTX.globalAlpha=1;
+
+    // broken horizontal slices
+    for(let k=0;k<7;k++){
+      const yy = (Math.sin((k*17.3+seed)+t*7.1)*Rg*0.8);
+      const hh = (0.12 + (Math.sin((k*3.9+seed)+t*9.3)*0.3+0.3)) * 7*DPR;
+      const dx = (Math.sin((k*5.7+seed)+t*11.7))*7*DPR;
+      CTX.globalCompositeOperation='lighter';
+      CTX.fillStyle = k%2? '#22d3ee' : '#a78bfa';
+      CTX.fillRect(-Rg+dx, yy, Rg*2, hh);
+    }
+    CTX.globalCompositeOperation='source-over';
+
+    // pixel snow
+    const snow=44;
+    for(let i=0;i<snow;i++){
+      const ang = (i*12.9898+seed)%6.283 + t*0.4;
+      const rr = (Math.sin(i*78.233+seed)*0.5+0.5) * Rg*0.95;
+      const px = Math.cos(ang)*rr;
+      const py = Math.sin(ang)*rr;
+      const s2 = ( (i%5)/5 + 0.25 ) * 2*DPR;
+      CTX.fillStyle = (i%3===0)? '#e2fdff' : (i%3===1? '#7de2ff' : '#a78bfa');
+      CTX.globalAlpha = 0.85*(0.4+0.6*((i*43758.5453)%1));
+      CTX.fillRect(px,py,s2,s2);
+    }
+    CTX.globalAlpha=1;
+
+    // exterior chroma ring
+    for(const [dx, col, alp] of [[-1*DPR,'#22d3ee',0.65],[1*DPR,'#a78bfa',0.65]]){
+      CTX.strokeStyle = col; CTX.globalAlpha=alp;
+      CTX.lineWidth=3*DPR; CTX.beginPath(); CTX.arc(dx,0,Rg*0.95,0,Math.PI*2); CTX.stroke();
+    }
+    CTX.globalAlpha=1;
+    CTX.restore();
+  }
+
   function update(dt){
     addBits(totalPPS()*dt); addRP(rpPerSec()*dt);
     state.combo.v=clamp(state.combo.v-state.combo.decay*dt,0,state.combo.max);
@@ -749,16 +915,22 @@ state.scrollY = state.scrollY || 0;
   }
 
   function draw(dt){
-    clicks.length=0; CTX.clearRect(0,0,CANVAS.width,CANVAS.height);
-    const g=CTX.createLinearGradient(0,0,0,CANVAS.height); g.addColorStop(0,'#0a0e13'); g.addColorStop(1,'#0a0e13'); CTX.fillStyle=g; CTX.fillRect(0,0,CANVAS.width,CANVAS.height);
+    clicks.length=0; 
+    drawQuantumTheme();
 
     const UIS=clamp(Math.min(CANVAS.width/(1280*DPR),CANVAS.height/(720*DPR)),0.8,1.15);
     state.ui.scale=UIS;
     const pad=16*DPR*UIS, headerH=64*DPR*UIS; const compact=(CANVAS.width/DPR)<980;
     let sidebarW=compact?(state.ui.drawerOpen?Math.min(320*DPR,CANVAS.width-2*pad):0):Math.max(340*DPR,CANVAS.width*0.30);
 
-    CTX.fillStyle='#0f1318'; roundRect(pad,pad,CANVAS.width-pad*2,headerH,14*DPR,true,false);
-    CTX.fillStyle='#e6eef6'; CTX.font=`800 ${20*DPR*state.ui.scale}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText('Quantum Forge',pad*2,pad+headerH/2);
+    CTX.save(); CTX.globalAlpha=0.88;
+    CTX.fillStyle=THEME.panel; roundRect(pad,pad,CANVAS.width-pad*2,headerH,14*DPR,true,false);
+    CTX.restore();
+
+    const titleX=pad*2, titleY=pad+headerH/2;
+    const grad=CTX.createLinearGradient(titleX-10*DPR,titleY,titleX+220*DPR,titleY);
+    grad.addColorStop(0,THEME.accent3); grad.addColorStop(1,THEME.accent2);
+    CTX.fillStyle=grad; CTX.font=`800 ${20*DPR*state.ui.scale}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText('Quantum Forge',titleX,titleY);
     let xr=CANVAS.width-pad*2-100*DPR; pill(xr,pad+headerH/2-10*DPR,`Buy: ${BUY_QTY[state.buyQtyIndex]}`); addClick(xr,pad+headerH/2-10*DPR,100*DPR,20*DPR,()=>cycleBuyQty(+1));
     xr-=150*DPR; pill(xr,pad+headerH/2-10*DPR,`Cores: ${fmt(state.ascend.cores)} (x${(1+state.ascend.cores*0.1).toFixed(2)})`);
     if(compact){
@@ -769,52 +941,110 @@ state.scrollY = state.scrollY || 0;
     const mainX=pad, mainY=pad*2+headerH; const mainW=CANVAS.width-sidebarW-pad*3; const mainH=CANVAS.height-mainY-pad;
     const sideX=CANVAS.width-sidebarW-pad, sideY=mainY, sideH=mainH;
 
-    CTX.fillStyle='#0f141a'; roundRect(mainX,mainY,mainW,mainH,16*DPR,true,false);
+    CTX.save(); CTX.globalAlpha=0.88;
+    CTX.fillStyle=THEME.panel; roundRect(mainX,mainY,mainW,mainH,16*DPR,true,false);
+    CTX.restore();
 
     (function(){
       const padHUD=10*DPR*UIS, f1=(16*UIS)*DPR, f2=(12*UIS)*DPR;
       const l1=`Bits: ${fmt(state.bits)}`, l2=`PPS: ${fmt(totalPPS())}   RP: ${fmt(state.rp)}`;
       CTX.font=`800 ${f1}px Inter`; const w1=CTX.measureText(l1).width; CTX.font=`700 ${f2}px Inter`; const w2=CTX.measureText(l2).width;
       const w=Math.max(w1,w2)+padHUD*2, h=f1+f2+padHUD*3, bx=mainX+(mainW-w)/2, by=mainY+8*DPR;
-      CTX.fillStyle='#0b1117'; roundRect(bx,by,w,h,10*DPR,true,false);
-      CTX.fillStyle='#e6eef6'; CTX.font=`800 ${f1}px Inter`; CTX.textAlign='center'; CTX.textBaseline='top'; CTX.fillText(l1,bx+w/2,by+padHUD*0.8);
-      CTX.fillStyle='#b6c6da'; CTX.font=`700 ${f2}px Inter`; CTX.fillText(l2,bx+w/2,by+padHUD*0.8+f1+6*DPR);
+      CTX.fillStyle=THEME.panel2; roundRect(bx,by,w,h,10*DPR,true,false);
+      CTX.fillStyle=THEME.text; CTX.font=`800 ${f1}px Inter`; CTX.textAlign='center'; CTX.textBaseline='top'; CTX.fillText(l1,bx+w/2,by+padHUD*0.8);
+      CTX.fillStyle=THEME.sub; CTX.font=`700 ${f2}px Inter`; CTX.fillText(l2,bx+w/2,by+padHUD*0.8+f1+6*DPR);
     })();
 
     const cx=mainX+mainW*0.5, cy=mainY+mainH*(compact?0.60:0.58); const R=Math.min(mainW,mainH)*(compact?0.28:0.32);
     state.clickArea={cx,cy,R};
     CTX.save(); CTX.shadowBlur=36*DPR; CTX.shadowColor='#213141'; CTX.fillStyle='#16202b'; CTX.beginPath(); CTX.arc(cx,cy,R,0,Math.PI*2); CTX.fill(); CTX.restore();
     const q=state.charge.t/state.charge.tMax; CTX.lineWidth=8*DPR; CTX.strokeStyle='#2d4156'; CTX.beginPath(); CTX.arc(cx,cy,R-14*DPR,-Math.PI/2,-Math.PI/2+Math.PI*2*q); CTX.stroke();
-    const a1=-Math.PI/2+Math.PI*2*state.critZone.lo, a2=-Math.PI/2+Math.PI*2*state.critZone.hi; CTX.strokeStyle='#86e7ff'; CTX.lineWidth=6*DPR; CTX.beginPath(); CTX.arc(cx,cy,R-18*DPR,a1,a2); CTX.stroke();
-    CTX.fillStyle='#e6eef6'; CTX.font=`800 ${22*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(state.charge.active?'RELEASE':'HOLD',cx,cy);
+    const a1=-Math.PI/2+Math.PI*2*state.critZone.lo, a2=-Math.PI/2+Math.PI*2*state.critZone.hi; 
+    const arcGrad=CTX.createLinearGradient(cx,cy-R,cx,cy+R);
+    arcGrad.addColorStop(0,THEME.accent3); arcGrad.addColorStop(1,THEME.accent2);
+    CTX.strokeStyle=arcGrad; CTX.lineWidth=6*DPR; CTX.beginPath(); CTX.arc(cx,cy,R-18*DPR,a1,a2); CTX.stroke();
+    CTX.fillStyle=THEME.text; CTX.font=`800 ${22*DPR}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(state.charge.active?'RELEASE':'HOLD',cx,cy);
 
-    if(state.glitch.active){const t=(Math.sin(performance.now()/180)+1)/2;CTX.save();CTX.translate(state.glitch.x,state.glitch.y);CTX.rotate(t*0.3);CTX.fillStyle='#ffd54a';CTX.beginPath();CTX.arc(0,0,16*DPR,0,Math.PI*2);CTX.fill();CTX.fillStyle='#7a5600';CTX.beginPath();CTX.arc(-5*DPR,-2*DPR,2.5*DPR,0,Math.PI*2);CTX.fill();CTX.restore();addClick(state.glitch.x-18*DPR,state.glitch.y-18*DPR,36*DPR,36*DPR,(px,py)=>{tryClickGlitch(px,py);});}
+    // === Glitch orb (true glitch visual) ===
+    if(state.glitch.active){
+      const Rg=18*DPR;
+      drawGlitchOrb(state.glitch.x, state.glitch.y, Rg, state.glitch.seed||0);
+      addClick(state.glitch.x-20*DPR,state.glitch.y-20*DPR,40*DPR,40*DPR,(px,py)=>{tryClickGlitch(px,py);});
+    }
 
     if(state.rift.active){
       const r=state.rift, rect=riftRect(), x=rect.x, w=rect.w, yMid=rect.yMid, h=rect.h;
-      CTX.save(); CTX.globalAlpha=0.5*r.open; CTX.fillStyle='#000'; CTX.fillRect(0,0,CANVAS.width,CANVAS.height); CTX.globalAlpha=1;
-      CTX.beginPath(); const segs=16, amp=8*DPR*r.open; let xx,yy;
-      CTX.moveTo(x,yMid-h/2);
-      for(let i=1;i<=segs;i++){const t=i/segs;xx=x+w*t;yy=yMid-h/2+Math.sin((t*10+r.wobble*2))*amp;CTX.lineTo(xx,yy);}
-      for(let i=segs;i>=0;i--){const t=i/segs;xx=x+w*t;yy=yMid+h/2+Math.sin((t*10+r.wobble*2+Math.PI))*amp;CTX.lineTo(xx,yy);}
-      CTX.closePath(); CTX.fillStyle='#0a0b12'; CTX.fill();
-      for(const s of r.stars){const sx=x+s.x*w, sy=yMid-h/2+s.y*h; CTX.globalAlpha=s.a; CTX.fillStyle='#8dd3ff'; CTX.fillRect(sx,sy,2*DPR,2*DPR);} CTX.globalAlpha=1;
-      CTX.strokeStyle='#1f2a3a'; CTX.lineWidth=2*DPR; CTX.stroke();
-      CTX.fillStyle='#e6eef6'; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='center'; CTX.fillText('RIFT! SPAM-CLICK!',x+w/2,yMid-h/2-28*DPR);
-      const barW=Math.min(w*0.7,520*DPR), barH=16*DPR, bx=x+(w-barW)/2, by=yMid+h/2+12*DPR; drawBar(bx,by,barW,barH,1-r.hp/r.hpMax,'#ef4444');
-      CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${12*DPR}px Inter`; const prizeTxt=r.prize==='bits'?`Reward: ${fmt(r.bitsReward)} bits`:`Reward: ${fmt(r.rpReward)} RP`; CTX.fillText(prizeTxt,x+w/2,by+barH+16*DPR);
+      const amp=8*DPR*r.open;
+      CTX.save();
+      CTX.globalAlpha=0.55*r.open; CTX.fillStyle='#000'; CTX.fillRect(0,0,CANVAS.width,CANVAS.height); CTX.globalAlpha=1;
+
+      function edgePath(offset,phase){
+        const segs=22; CTX.beginPath();
+        CTX.moveTo(x, yMid-h/2+offset);
+        for(let i=1;i<=segs;i++){
+          const t=i/segs;
+          const xx=x+w*t;
+          const yy=yMid-h/2 + offset + Math.sin((t*12 + r.wobble*2 + phase))*amp + Math.sin((t*33 + r.wobble*4 + phase))*amp*0.25;
+          CTX.lineTo(xx,yy);
+        }
+      }
+      CTX.beginPath();
+      edgePath(0,0);
+      CTX.lineTo(x+w, yMid+h/2);
+      for(let i=22;i>=0;i--){
+        const t=i/22;
+        const xx=x+w*t;
+        const yy=yMid+h/2 + Math.sin((t*12 + r.wobble*2 + Math.PI))*amp + Math.sin((t*33 + r.wobble*4 + Math.PI))*amp*0.25;
+        CTX.lineTo(xx,yy);
+      }
+      CTX.closePath();
+      const inner=CTX.createLinearGradient(x,yMid-h/2,x+w,yMid+h/2);
+      inner.addColorStop(0,'#05070a'); inner.addColorStop(0.5,'#02040a'); inner.addColorStop(1,'#05070a');
+      CTX.fillStyle=inner; CTX.fill();
+
+      for(const s of r.stars){
+        const sx=x+s.x*w, sy=yMid-h/2+s.y*h + Math.sin(r.wobble*2 + s.x*10)*3*DPR;
+        CTX.globalAlpha=s.a; CTX.fillStyle=THEME.accent;
+        CTX.fillRect(sx,sy,2*DPR,2*DPR);
+      }
+      CTX.globalAlpha=1;
+
+      for(const [dx,color] of [[-1*DPR,'#7dd3fc'],[0,THEME.accent2],[1*DPR,'#22d3ee']]){
+        CTX.strokeStyle=color; CTX.lineWidth=2*DPR;
+        edgePath(0,0); CTX.stroke();
+        CTX.beginPath();
+        CTX.moveTo(x+dx, yMid+h/2);
+        const segs=22;
+        for(let i=1;i<=segs;i++){
+          const t=i/segs;
+          const xx=x+dx+w*t;
+          const yy=yMid+h/2 + Math.sin((t*12 + r.wobble*2 + Math.PI))*amp + Math.sin((t*33 + r.wobble*4 + Math.PI))*amp*0.25;
+          CTX.lineTo(xx,yy);
+        }
+        CTX.stroke();
+      }
+
+      CTX.fillStyle=THEME.text; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='center'; 
+      CTX.fillText('RIFT! SPAM-CLICK!',x+w/2,yMid-h/2-28*DPR);
+      const barW=Math.min(w*0.7,520*DPR), barH=16*DPR, bx=x+(w-barW)/2, by=yMid+h/2+12*DPR; 
+      drawBar(bx,by,barW,barH,1-r.hp/r.hpMax,THEME.bad);
+      CTX.fillStyle=THEME.sub; CTX.font=`700 ${12*DPR}px Inter`; 
+      const prizeTxt=r.prize==='bits'?`Reward: ${fmt(r.bitsReward)} bits`:`Reward: ${fmt(r.rpReward)} RP`; 
+      CTX.fillText(prizeTxt,x+w/2,by+barH+16*DPR);
       CTX.restore();
     }
 
     if(sidebarW>0){
-      CTX.fillStyle='#0f141a'; roundRect(sideX,sideY,sidebarW,sideH,16*DPR,true,false);
+      CTX.save(); CTX.globalAlpha=0.88;
+      CTX.fillStyle=THEME.panel; roundRect(sideX,sideY,sidebarW,sideH,16*DPR,true,false);
+      CTX.restore();
       const tabs=['Forge','Shop','Research','Arcade','Achievements','Stats','Ascend','Settings'];
       if(state.cheat.unlocked) tabs.push('Cheats');
       const tabH=40*DPR; let tx=sideX; const tw=sidebarW/tabs.length; const tabFs=tw<90*DPR?11*DPR:13*DPR;
       for(const tname of tabs){
         const active=state.tab===tname;
-        CTX.fillStyle=active?'#1a222b':'#0f141a'; roundRect(tx,sideY,tw,tabH,10*DPR,true,false);
-        CTX.fillStyle=active?'#e2ebf5':'#9fb0c6'; CTX.font=`700 ${tabFs}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(tname,tx+tw/2,sideY+tabH/2);
+        CTX.fillStyle=active?THEME.panel2:THEME.panel; roundRect(tx,sideY,tw,tabH,10*DPR,true,false);
+        CTX.fillStyle=active?THEME.text:THEME.sub; CTX.font=`700 ${tabFs}px Inter`; CTX.textAlign='center'; CTX.textBaseline='middle'; CTX.fillText(tname,tx+tw/2,sideY+tabH/2);
         addClick(tx,sideY,tw,tabH,()=>{state.tab=tname; state.ui.scrollVel=0;});
         tx+=tw;
       }
@@ -826,12 +1056,12 @@ state.scrollY = state.scrollY || 0;
 
       if(state.tab==='Forge'){
         const rowH=70*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false);
-        CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top';
+        CTX.fillStyle=THEME.sub; CTX.font=`600 ${12*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top';
         CTX.fillText(`Combo: ${(state.combo.v*100).toFixed(0)}% (decay ${Math.round(state.combo.decay*100)}%/s)`,listX+12*DPR,y+12*DPR);
         CTX.fillText(`PPS (after combo): ${fmt(totalPPS())} | RP/s: ${fmt(rpPerSec())}`,listX+12*DPR,y+32*DPR);
         y+=rowH+10*DPR;
-        const rowH2=80*DPR; CTX.fillStyle='#0f141a'; roundRect(listX,y,listW,rowH2,10*DPR,true,false);
-        CTX.fillStyle='#b6c6da'; CTX.font=`600 ${12*DPR}px Inter`;
+        const rowH2=80*DPR; CTX.fillStyle=THEME.panel; roundRect(listX,y,listW,rowH2,10*DPR,true,false);
+        CTX.fillStyle=THEME.sub; CTX.font=`600 ${12*DPR}px Inter`;
         CTX.fillText('Hold inside the core to charge. Release in the highlighted arc for critical payout. Play Arcade for bursts & RP.',listX+12*DPR,y+14*DPR);
         y+=rowH2+10*DPR;
       }
@@ -843,22 +1073,22 @@ state.scrollY = state.scrollY || 0;
           const cost=moduleCost(m.id,nToBuy), afford=nToBuy>0&&state.bits>=cost, rowH=baseRowH;
           CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR*us,true,false);
           const nameX=listX+12*DPR*us, nameY=y+10*DPR*us;
-          CTX.fillStyle='#e6eef6'; CTX.font=`800 ${15*DPR*us}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.fillText(m.name,nameX,nameY);
+          CTX.fillStyle=THEME.text; CTX.font=`800 ${15*DPR*us}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.fillText(m.name,nameX,nameY);
           const label=qty==='Max'?`Buy ${nToBuy}`:`Buy x${nToBuy}`;
           const fsBtn=14*DPR*us; CTX.font=`700 ${fsBtn}px Inter`;
           const bw=Math.max(100*DPR*us,CTX.measureText(label).width+28*DPR*us), bh=32*DPR*us;
           const bx=listX+listW-bw-12*DPR*us, by=y+rowH-bh-10*DPR*us;
           if(isNarrow){
-            CTX.fillStyle=afford?'#b8f0c2':'#93a6bf'; CTX.font=`800 ${13*DPR*us}px Inter`; CTX.textAlign='left';
+            CTX.fillStyle=afford?THEME.good:THEME.sub; CTX.font=`800 ${13*DPR*us}px Inter`; CTX.textAlign='left';
             CTX.fillText(`Cost: ${fmt(cost)}`,nameX,nameY+20*DPR*us);
-            CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR*us}px Inter`;
+            CTX.fillStyle=THEME.sub; CTX.font=`600 ${12*DPR*us}px Inter`;
             const rpLine = m.rp?` • RP: ${m.rp}/s`:'';
             CTX.fillText(`Owned: ${n} • +${fmt(moduleProd(m.id))}/s${rpLine}`,nameX,nameY+38*DPR*us);
           }else{
-            CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR*us}px Inter`; CTX.textAlign='left';
+            CTX.fillStyle=THEME.sub; CTX.font=`600 ${12*DPR*us}px Inter`; CTX.textAlign='left';
             const rpLine = m.rp?` • RP: ${m.rp}/s`:'';
             CTX.fillText(`Owned: ${n} • +${fmt(moduleProd(m.id))}/s${rpLine}`,nameX,nameY+22*DPR*us);
-            CTX.fillStyle=afford?'#b8f0c2':'#93a6bf'; CTX.font=`800 ${14*DPR*us}px Inter`; CTX.textAlign='right';
+            CTX.fillStyle=afford?THEME.good:THEME.sub; CTX.font=`800 ${14*DPR*us}px Inter`; CTX.textAlign='right';
             CTX.fillText(`Cost: ${fmt(cost)}`,bx-12*DPR*us,nameY+2*DPR*us);
           }
           drawButton(bx,by,bw,bh,label,afford,true); addClick(bx,by,bw,bh,()=>buyModule(m.id));
@@ -868,13 +1098,12 @@ state.scrollY = state.scrollY || 0;
 
       if(state.tab==='Research'){
         const rowH=60*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false);
-        CTX.fillStyle='#e6eef6'; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle';
+        CTX.fillStyle=THEME.text; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle';
         CTX.fillText('Open Research Tree', listX+14*DPR, y+rowH/2);
         const bw=180*DPR,bh=34*DPR; const bx=listX+listW-bw-12*DPR, by=y+rowH/2-bh/2;
         drawButton(bx,by,bw,bh,'Open Tree',true,true); addClick(bx,by,bw,bh,openResearch);
         y+=rowH+10*DPR;
-        // (Optionally list owned tech)
-        CTX.fillStyle='#9fb0c6'; CTX.font=`700 ${12*DPR}px Inter`; CTX.fillText(`Owned: ${state.tech.length} • RP: ${fmt(state.rp)}`,listX+12*DPR,y+14*DPR);
+        CTX.fillStyle=THEME.sub; CTX.font=`700 ${12*DPR}px Inter`; CTX.fillText(`Owned: ${state.tech.length} • RP: ${fmt(state.rp)}`,listX+12*DPR,y+14*DPR);
       }
 
       if(state.tab==='Arcade'){
@@ -885,7 +1114,7 @@ state.scrollY = state.scrollY || 0;
           const rowH=isNarrow?(bh+32*DPR*us+22*DPR*us):56*DPR*us;
           CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR*us,true,false);
           const bx=listX+12*DPR*us, by=y+10*DPR*us; drawButton(bx,by,bw,bh,title,true,true); addClick(bx,by,bw,bh,onClick);
-          CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR*us}px Inter`; CTX.textAlign='left';
+          CTX.fillStyle=THEME.sub; CTX.font=`600 ${12*DPR*us}px Inter`; CTX.textAlign='left';
           if(isNarrow) CTX.fillText(desc,bx,by+bh+16*DPR*us); else {const dx=bx+bw+14*DPR*us, dy=y+rowH/2+4*DPR*us; CTX.textBaseline='middle'; CTX.fillText(desc,dx,dy);}
           y+=rowH+10*DPR*us;
         }
@@ -896,18 +1125,18 @@ state.scrollY = state.scrollY || 0;
 
       if(state.tab==='Achievements'){
         const rows=[['First Pulse','Release a charged pulse once',state.lifetimeBits>0],['Collector','Own 30 modules total',state.modules.reduce((a,b)=>a+(b.count||0),0)>=30],['Researcher','Spend 200 RP',state.rpTotal>=200],['Arcader','Finish a minigame',state.arcadeLastRewarded]];
-        for(const r of rows){const rowH=48*DPR; CTX.fillStyle=r[2]?'#14211a':'#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false); CTX.fillStyle=r[2]?'#e2f6e9':'#e8f0f8'; CTX.font=`800 ${14*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(r[0],listX+12*DPR,y+rowH/2-10*DPR); CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR}px Inter`; CTX.fillText(r[1],listX+12*DPR,y+rowH/2+10*DPR); y+=rowH+8*DPR;}
+        for(const r of rows){const rowH=48*DPR; CTX.fillStyle=r[2]?'#14211a':'#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false); CTX.fillStyle=r[2]?'#e2f6e9':THEME.text; CTX.font=`800 ${14*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(r[0],listX+12*DPR,y+rowH/2-10*DPR); CTX.fillStyle=THEME.sub; CTX.font=`600 ${12*DPR}px Inter`; CTX.fillText(r[1],listX+12*DPR,y+rowH/2+10*DPR); y+=rowH+8*DPR;}
       }
 
       if(state.tab==='Stats'){
         const stats=[['Bits',fmt(state.bits)],['Lifetime Bits',fmt(state.lifetimeBits)],['PPS (base)',fmt(totalPPS()/(1+state.combo.v))],['PPS (with combo)',fmt(totalPPS())],['RP',fmt(state.rp)],['RP/s',fmt(rpPerSec())],['Modules',state.modules.reduce((a,b)=>a+(b.count||0),0).toString()],['Cores',fmt(state.ascend.cores)]];
-        for(const [k,v] of stats){const rowH=40*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,8*DPR,true,false); CTX.fillStyle='#a9b9cf'; CTX.font=`600 ${12*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(k,listX+12*DPR,y+rowH/2); CTX.textAlign='right'; CTX.fillStyle='#e8f0f8'; CTX.font=`800 ${13*DPR}px Inter`; CTX.fillText(v,listX+listW-12*DPR,y+rowH/2); y+=rowH+8*DPR;}
+        for(const [k,v] of stats){const rowH=40*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,8*DPR,true,false); CTX.fillStyle='#a9b9cf'; CTX.font=`600 ${12*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(k,listX+12*DPR,y+rowH/2); CTX.textAlign='right'; CTX.fillStyle=THEME.text; CTX.font=`800 ${13*DPR}px Inter`; CTX.fillText(v,listX+listW-12*DPR,y+rowH/2); y+=rowH+8*DPR;}
       }
 
       if(state.tab==='Ascend'){
         const gain=coreGain(); const rowH=120*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR,true,false);
-        CTX.fillStyle='#e8f0f8'; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.fillText('Ascend resets progress for permanent Cores',listX+12*DPR,y+10*DPR);
-        CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${13*DPR}px Inter`; CTX.fillText(`You would gain: ${gain} cores (global x${(1+(state.ascend.cores+gain)*0.1).toFixed(2)})`,listX+12*DPR,y+32*DPR);
+        CTX.fillStyle=THEME.text; CTX.font=`800 ${16*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.fillText('Ascend resets progress for permanent Cores',listX+12*DPR,y+10*DPR);
+        CTX.fillStyle=THEME.sub; CTX.font=`600 ${13*DPR}px Inter`; CTX.fillText(`You would gain: ${gain} cores (global x${(1+(state.ascend.cores+gain)*0.1).toFixed(2)})`,listX+12*DPR,y+32*DPR);
         const bw=160*DPR,bh=36*DPR; const bx=listX+listW-bw-12*DPR, by=y+rowH-bh-12*DPR; drawButton(bx,by,bw,bh,'Ascend (P)',gain>0,true); addClick(bx,by,bw,bh,()=>tryAscend());
       }
 
@@ -915,7 +1144,7 @@ state.scrollY = state.scrollY || 0;
         const items=[['Particles','particles'],['Low FX','lowFX'],['Mute (M)','mute'],['Export (E)','export'],['Import (I)','import'],['Reset Progress','reset']];
         for(const it of items){
           const rowH=44*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,8*DPR,true,false);
-          CTX.fillStyle='#e8f0f8'; CTX.font=`700 ${13*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(it[0],listX+12*DPR,y+rowH/2);
+          CTX.fillStyle=THEME.text; CTX.font=`700 ${13*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle'; CTX.fillText(it[0],listX+12*DPR,y+rowH/2);
           const bw=110*DPR,bh=30*DPR; const bx=listX+listW-bw-12*DPR, by=y+rowH/2-bh/2;
           if(it[1]==='export'){drawButton(bx,by,bw,bh,'Export',true,true);addClick(bx,by,bw,bh,()=>doExport());}
           else if(it[1]==='import'){drawButton(bx,by,bw,bh,'Import',true,true);addClick(bx,by,bw,bh,()=>doImport());}
@@ -936,7 +1165,7 @@ state.scrollY = state.scrollY || 0;
           y+=rowH+8*DPR;
         }
         const rowH=60*DPR; CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,8*DPR,true,false);
-        CTX.fillStyle='#e8f0f8'; CTX.font=`700 ${13*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.fillText('Buy Quantity ([-] / [=])',listX+12*DPR,y+10*DPR);
+        CTX.fillStyle=THEME.text; CTX.font=`700 ${13*DPR}px Inter`; CTX.textAlign='left'; CTX.textBaseline='top'; CTX.fillText('Buy Quantity ([-] / [=])',listX+12*DPR,y+10*DPR);
         const wBtn=70*DPR; let bx=listX+12*DPR; const by=y+rowH-38*DPR;
         BUY_QTY.forEach((q,i)=>{const on=i===state.buyQtyIndex; drawButton(bx,by,wBtn,28*DPR,q.toString(),true,on); addClick(bx,by,wBtn,28*DPR,()=>{state.buyQtyIndex=i;}); bx+=wBtn+8*DPR;});
       }
@@ -948,7 +1177,7 @@ state.scrollY = state.scrollY || 0;
           CTX.fillStyle='#121821'; roundRect(listX,y,listW,rowH,10*DPR*us,true,false);
           const bw=180*DPR*us, bh=34*DPR*us, bx=listX+12*DPR*us, by=y+rowH/2-bh/2;
           drawButton(bx,by,bw,bh,label,true,true); addClick(bx,by,bw,bh,fn);
-          CTX.fillStyle='#9fb0c6'; CTX.font=`600 ${12*DPR*us}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle';
+          CTX.fillStyle=THEME.sub; CTX.font=`600 ${12*DPR*us}px Inter`; CTX.textAlign='left'; CTX.textBaseline='middle';
           CTX.fillText(desc, bx+bw+14*DPR*us, y+rowH/2);
           y+=rowH+10*DPR*us;
         }
@@ -971,7 +1200,6 @@ state.scrollY = state.scrollY || 0;
 
       CTX.restore();
 
-      // Scroll
       state.ui.maxScroll = Math.max(0, (y + sOff) - (listY + listH));
       sOff = clamp(sOff, 0, state.ui.maxScroll);
       state.scroll[state.tab] = sOff;
