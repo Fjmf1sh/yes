@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>AR Hypercube (Tesseract)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; }
+  #ui { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 12px; 
+        display: flex; gap: 10px; justify-content: space-between; align-items: center;
+        background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.55) 25%, rgba(0,0,0,.8) 100%);
+        color: #fff; font: 15px/1.2 system-ui, -apple-system, Roboto, Segoe UI, Arial, sans-serif; }
+  #hint { opacity: .9 }
+  #btnEnterAR, #btnReset { appearance: none; border: 0; padding: 10px 12px; border-radius: 10px; font-weight: 600; }
+  #btnEnterAR { background: #00d084; color:#001a12; }
+  #btnReset { background: #222; color:#fff; }
+  #overlay { position: fixed; inset: 0; display: none; place-items: center; background: rgba(0,0,0,.75); color: #fff; }
+  #overlay.show { display: grid; }
+  #overlay div { max-width: 480px; padding: 18px; text-align: center; }
+  a { color: #7fd4ff; }
+</style>
+</head>
+<body>
+<div id="overlay"><div>
+  <h2>AR not supported</h2>
+  <p>Your browser doesn't support WebXR AR here. You'll see a regular 3D view instead.<br/>
+  Tip: Upload this file to an HTTPS site and open it in a modern mobile browser. On iOS, ensure you're on the latest version.</p>
+  <button id="closeOverlay" style="padding:10px 14px; border-radius:10px; border:0; background:#00d084; color:#001a12; font-weight:700;">OK</button>
+</div></div>
+
+<div id="ui">
+  <div id="hint">Tap a surface to place the hypercube. Drag to rotate in non‑AR.</div>
+  <div>
+    <button id="btnEnterAR">Enter AR</button>
+    <button id="btnReset">Reset</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.159/build/three.module.js';
+import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.159/examples/jsm/webxr/ARButton.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.159/examples/jsm/controls/OrbitControls.js';
+
+const ui = {
+  overlay: document.getElementById('overlay'),
+  closeOverlay: document.getElementById('closeOverlay'),
+  hint: document.getElementById('hint'),
+  enterAR: document.getElementById('btnEnterAR'),
+  reset: document.getElementById('btnReset'),
+};
+
+// Scene / renderer
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.01, 50);
+
+// Fallback (non-AR) controls
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.enablePan = false;
+controls.minDistance = 0.2;
+controls.maxDistance = 6;
+
+// Lighting for non-AR
+const light = new THREE.HemisphereLight(0xffffff, 0x222233, 1.0);
+scene.add(light);
+
+// Reticle for AR placement
+const reticle = new THREE.Mesh(
+  new THREE.RingGeometry(0.05, 0.06, 32).rotateX(-Math.PI/2),
+  new THREE.MeshBasicMaterial({ color: 0xffffff })
+);
+reticle.matrixAutoUpdate = false;
+reticle.visible = false;
+scene.add(reticle);
+
+// Hypercube (tesseract) group
+const tesseract = new THREE.Group();
+scene.add(tesseract);
+
+// Build 4D hypercube edges
+const vertices4D = [];
+for (let x of [-1, 1]) for (let y of [-1, 1]) for (let z of [-1, 1]) for (let w of [-1, 1]) {
+  vertices4D.push([x, y, z, w]);
+}
+
+// Edges: connect vertices differing by exactly one coordinate
+function hammingDistance(a, b) {
+  let d = 0;
+  for (let i=0; i<4; i++) if (a[i] !== b[i]) d++;
+  return d;
+}
+const edges = [];
+for (let i=0; i<vertices4D.length; i++) {
+  for (let j=i+1; j<vertices4D.length; j++) {
+    if (hammingDistance(vertices4D[i], vertices4D[j]) === 1) {
+      edges.push([i, j]);
+    }
+  }
+}
+// 32 edges expected
+// Build a single BufferGeometry for all edges
+const positions = new Float32Array(edges.length * 2 * 3);
+const geo = new THREE.BufferGeometry();
+geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+const line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ linewidth: 1 }));
+tesseract.add(line);
+
+// Small corner points
+const ptsGeo = new THREE.BufferGeometry();
+ptsGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices4D.length*3), 3));
+const pts = new THREE.Points(ptsGeo, new THREE.PointsMaterial({ size: 0.01 }));
+tesseract.add(pts);
+
+// Give it a subtle neon material in additive blending
+line.material.transparent = true;
+line.material.opacity = 0.95;
+line.material.blending = THREE.AdditiveBlending;
+line.material.depthWrite = false;
+pts.material.transparent = true;
+pts.material.opacity = 0.95;
+pts.material.blending = THREE.AdditiveBlending;
+pts.material.depthWrite = false;
+
+// Colors shift over time
+const colorA = new THREE.Color(0x66ccff);
+const colorB = new THREE.Color(0xff66cc);
+
+// 4D rotation angles
+let axw = 0, ayw = 0.7, azw = 1.1;
+let arActive = false;
+let placed = false;
+
+// For AR hit-test
+let xrHitTestSource = null;
+let xrViewerSpace = null;
+let xrRefSpace = null;
+
+// Size + initial camera
+function onResize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+addEventListener('resize', onResize, false);
+camera.position.set(0, 0.3, 1.1);
+
+// Non-AR grid to give depth cue
+const grid = new THREE.GridHelper(4, 40, 0x666666, 0x333333);
+grid.position.y = -0.5;
+scene.add(grid);
+
+// Generate 4D->3D positions
+function rotate4D([x, y, z, w]) {
+  // Rotate in XW, YW, ZW planes
+  const cosXW = Math.cos(axw), sinXW = Math.sin(axw);
+  const cosYW = Math.cos(ayw), sinYW = Math.sin(ayw);
+  const cosZW = Math.cos(azw), sinZW = Math.sin(azw);
+  // XW
+  let x1 = x * cosXW - w * sinXW;
+  let w1 = x * sinXW + w * cosXW;
+  let y1 = y, z1 = z;
+  // YW
+  let y2 = y1 * cosYW - w1 * sinYW;
+  let w2 = y1 * sinYW + w1 * cosYW;
+  let x2 = x1, z2 = z1;
+  // ZW
+  let z3 = z2 * cosZW - w2 * sinZW;
+  let w3 = z2 * sinZW + w2 * cosZW;
+  let x3 = x2, y3 = y2;
+  // Project to 3D (orthographic 4D->3D)
+  return [x3, y3, z3, w3];
+}
+
+function project4Dto3D([x, y, z, w]) {
+  // Perspective-like divide on W to emphasize depth
+  const d = 2.5;
+  const k = 1.0 / (d - w); // as w approaches d, object appears further
+  return [x * k, y * k, z * k];
+}
+
+function updateTesseractGeometry(scale=0.15) {
+  // Update vertices
+  const ptsPos = pts.geometry.attributes.position.array;
+  for (let i=0; i<vertices4D.length; i++) {
+    const p4 = rotate4D(vertices4D[i]);
+    const [px, py, pz] = project4Dto3D(p4);
+    ptsPos[i*3+0] = px * scale;
+    ptsPos[i*3+1] = py * scale;
+    ptsPos[i*3+2] = pz * scale;
+  }
+  pts.geometry.attributes.position.needsUpdate = true;
+
+  // Update edges
+  const arr = line.geometry.attributes.position.array;
+  for (let e=0; e<edges.length; e++) {
+    const [i, j] = edges[e];
+    const p4i = rotate4D(vertices4D[i]);
+    const p4j = rotate4D(vertices4D[j]);
+    const pi = project4Dto3D(p4i);
+    const pj = project4Dto3D(p4j);
+    arr[e*6+0] = pi[0]*scale; arr[e*6+1] = pi[1]*scale; arr[e*6+2] = pi[2]*scale;
+    arr[e*6+3] = pj[0]*scale; arr[e*6+4] = pj[1]*scale; arr[e*6+5] = pj[2]*scale;
+  }
+  line.geometry.attributes.position.needsUpdate = true;
+
+  // Animate color
+  const t = (performance.now() * 0.0003) % 1.0;
+  const c = colorA.clone().lerp(colorB, 0.5 + 0.5*Math.sin(t*2*Math.PI));
+  line.material.color.copy(c);
+  pts.material.color.copy(c);
+}
+
+// Handle AR session setup
+async function setupAR() {
+  if (!navigator.xr) {
+    ui.overlay.classList.add('show');
+    return;
+  }
+  const supported = await navigator.xr.isSessionSupported('immersive-ar');
+  if (!supported) {
+    ui.overlay.classList.add('show');
+    return;
+  }
+
+  const button = ARButton.createButton(renderer, {
+    requiredFeatures: ['hit-test'],
+    optionalFeatures: ['dom-overlay', 'local-floor'],
+    domOverlay: { root: document.body }
+  });
+  // Hide default ARButton, we use our own
+  button.style.display = 'none';
+
+  ui.enterAR.onclick = async () => {
+    try {
+      await renderer.xr.setSession(await navigator.xr.requestSession('immersive-ar', {
+        requiredFeatures: ['hit-test'],
+        optionalFeatures: ['dom-overlay', 'local-floor'],
+        domOverlay: { root: document.body }
+      }));
+    } catch (e) {
+      console.warn(e);
+      ui.overlay.classList.add('show');
+    }
+  };
+
+  renderer.xr.addEventListener('sessionstart', onSessionStart);
+  renderer.xr.addEventListener('sessionend', onSessionEnd);
+}
+
+async function onSessionStart() {
+  arActive = true;
+  placed = false;
+  ui.hint.textContent = 'Move your phone to find a surface, then tap to place.';
+  grid.visible = false;
+  controls.enabled = false;
+
+  const session = renderer.xr.getSession();
+  xrRefSpace = await session.requestReferenceSpace('local');
+  xrViewerSpace = await session.requestReferenceSpace('viewer');
+  const hitTestSource = await session.requestHitTestSource({ space: xrViewerSpace });
+  xrHitTestSource = hitTestSource;
+
+  session.addEventListener('select', () => {
+    if (reticle.visible) {
+      tesseract.position.setFromMatrixPosition(reticle.matrix);
+      tesseract.quaternion.setFromRotationMatrix(reticle.matrix);
+      placed = true;
+      ui.hint.textContent = 'Placed! Walk around it.';
+    }
+  });
+}
+
+function onSessionEnd() {
+  arActive = false;
+  placed = false;
+  xrHitTestSource?.cancel();
+  xrHitTestSource = null;
+  xrViewerSpace = null;
+  xrRefSpace = null;
+  reticle.visible = false;
+  ui.hint.textContent = 'Tap Enter AR to place the hypercube.';
+  grid.visible = true;
+  controls.enabled = true;
+  camera.position.set(0, 0.3, 1.1);
+}
+
+// Tap to place in non-AR: center front
+renderer.domElement.addEventListener('click', () => {
+  if (!arActive) {
+    tesseract.position.set(0, 0, 0);
+    placed = true;
+  }
+});
+
+// Reset placement
+ui.reset.onclick = () => {
+  placed = false;
+  tesseract.position.set(0, 0, 0);
+  reticle.visible = arActive; // will show when surface found
+  ui.hint.textContent = arActive ? 'Tap to place again.' : 'Tap to place in front.';
+};
+
+ui.closeOverlay?.addEventListener('click', () => ui.overlay.classList.remove('show'));
+
+// Animation loop
+renderer.setAnimationLoop((timestamp, frame) => {
+  // Spin in 4D
+  const dt = 0.016;
+  axw += 0.4 * dt;
+  ayw += 0.27 * dt;
+  azw += 0.33 * dt;
+  updateTesseractGeometry(arActive ? 0.12 : 0.25);
+
+  if (arActive && frame) {
+    const refSpace = xrRefSpace;
+    const hitSource = xrHitTestSource;
+    const pose = frame.getViewerPose(refSpace);
+    if (hitSource && pose) {
+      const hits = frame.getHitTestResults(hitSource);
+      if (hits.length > 0 && !placed) {
+        const hit = hits[0];
+        reticle.visible = true;
+        reticle.matrix.fromArray(hit.getPose(refSpace).transform.matrix);
+      } else if (!placed) {
+        reticle.visible = false;
+      }
+    }
+  } else {
+    controls.update();
+  }
+
+  renderer.render(scene, camera);
+});
+
+// Start
+setupAR();
+</script>
+</body>
+</html>
