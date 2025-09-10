@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Vision HW Helper — Mobile (v2)</title>
+  <title>Vision HW Helper — Mobile (v4, Multi-Provider + Delete)</title>
   <style>
     :root{--bg:#0b0b10;--panel:#10141b;--ink:#eef2f6;--muted:#a6b0c2;--acc:#4da3ff;--bad:#ff5d6c}
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -12,19 +12,21 @@
          font:16px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto}
     header{position:sticky;top:0;z-index:3;background:#0c1016;border-bottom:1px solid #1d2431;padding:14px 16px}
     h1{margin:0;font-size:18px}
-    .wrap{max-width:720px;margin:0 auto;padding:14px}
+    .wrap{max-width:780px;margin:0 auto;padding:14px}
     .card{background:var(--panel);border:1px solid #1d2431;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.35);margin-bottom:12px}
     .pad{padding:14px}
     label{display:block;margin:0 0 6px 2px;color:var(--muted);font-size:13px}
     input, select, textarea, button{font-size:16px}
-    input[type="password"], textarea, select{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #273246;background:#0d1117;color:var(--ink)}
+    input[type="password"], textarea, select, input[type="text"]{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #273246;background:#0d1117;color:var(--ink)}
     textarea{min-height:100px}
     .row{display:flex;gap:10px;flex-wrap:wrap}
     .row>*{flex:1 1 240px}
     .drop{border:1.5px dashed #2a3647;border-radius:14px;padding:14px;text-align:center;color:#b6c0d2;background:#0d1219}
     .drop.hover{border-color:var(--acc);background:#0f1622}
-    .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    .thumbs img{height:80px;border-radius:10px;border:1px solid #263145}
+    .thumbs{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .thumb{position:relative}
+    .thumb img{height:84px;border-radius:10px;border:1px solid #263145;display:block}
+    .del{position:absolute;top:-8px;right:-8px;background:#ff5d6c;border:0;color:#0b0b10;width:28px;height:28px;border-radius:20px;font-weight:800;cursor:pointer}
     .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border:0;border-radius:12px;background:var(--acc);color:#08101b;font-weight:800}
     .btn.secondary{background:#182235;color:#c8d3e6;border:1px solid #263145}
@@ -34,43 +36,49 @@
     .switch{display:flex;align-items:center;gap:10px}
     .switch input{width:1.3em;height:1.3em}
     .warn{color:var(--bad)}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#101826;border:1px solid #243043;color:#b9c6d8;font-size:12px}
   </style>
 </head>
 <body>
   <header>
-    <h1>Vision HW Helper — Mobile (v2)</h1>
+    <h1>Vision HW Helper — Mobile (v4)</h1>
   </header>
   <div class="wrap">
     <div class="card">
       <div class="pad">
         <div class="row">
           <div>
-            <label for="key">OpenAI API Key</label>
-            <input id="key" type="password" placeholder="sk-..." autocomplete="off" inputmode="none" />
+            <label for="provider">Provider</label>
+            <select id="provider">
+              <option value="openai" selected>OpenAI</option>
+              <option value="google">Google (Gemini)</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+            </select>
+          </div>
+          <div>
+            <label for="model">Model</label>
+            <select id="model"></select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:6px">
+          <div>
+            <label for="apiKey">API Key</label>
+            <input id="apiKey" type="password" placeholder="sk-... / AIza... / sk-ant-..." autocomplete="off" />
             <div class="switch" style="margin-top:8px">
               <input id="remember" type="checkbox" />
               <label for="remember" class="small">Remember key on this device (localStorage)</label>
             </div>
           </div>
-          <div>
-            <label for="model">Model</label>
-            <select id="model">
-              <!-- Vision models (no reasoning param) -->
-              <option value="gpt-4o" selected>gpt-4o (vision)</option>
-              <option value="gpt-4o-mini">gpt-4o-mini (vision, cheap)</option>
-              <option value="gpt-4.1-mini">gpt-4.1-mini (vision)</option>
-              <!-- Reasoning-capable models -->
-              <option value="o3-mini">o3-mini (reasoning + vision)</option>
-              <option value="o4-mini">o4-mini (reasoning + vision)</option>
-            </select>
+          <div id="baseUrlBox" style="display:none">
+            <label for="baseUrl">Base URL (optional)</label>
+            <input id="baseUrl" type="text" placeholder="Only for OpenAI-compatible proxies" />
           </div>
         </div>
 
         <div class="row" style="margin-top:6px">
           <div class="switch">
             <input id="reasoningToggle" type="checkbox" />
-            <label for="reasoningToggle" class="small">Enable reasoning effort</label>
+            <label for="reasoningToggle" class="small">Enable reasoning effort (OpenAI o3/o4 only)</label>
           </div>
           <div>
             <label for="effort" class="small">Reasoning effort</label>
@@ -96,6 +104,7 @@
               <button class="btn secondary" id="pick">Choose Photos</button>
               <button class="btn secondary" id="camera">Open Camera</button>
               <button class="btn secondary" id="paste">Paste Clipboard</button>
+              <button class="btn secondary" id="clearImgs">Clear All Images</button>
             </div>
             <div id="thumbs" class="thumbs"></div>
           </div>
@@ -103,7 +112,7 @@
 
         <div class="actions" style="margin-top:12px">
           <button class="btn" id="run">Ask</button>
-          <button class="btn secondary" id="clear">Clear</button>
+          <button class="btn secondary" id="clear">Clear Output</button>
           <span class="small" id="capNote"></span>
         </div>
       </div>
@@ -111,155 +120,170 @@
     </div>
 
     <div class="card"><div class="pad small">
-      ⚠️ Use this for learning, not for turning in AI-only homework. Your API key stays on device (unless you choose “Remember”).
+      ⚠️ Use this for learning. Keys are stored only on-device (unless you opt in). Some providers enforce quotas even on free tiers.
     </div></div>
   </div>
 
   <script>
     const el = (id)=>document.getElementById(id);
-    const key = el('key'), remember = el('remember'), model = el('model'),
-          reasoningToggle = el('reasoningToggle'), effort = el('effort'),
-          promptEl = el('prompt'), file = el('file'), pickBtn = el('pick'),
-          cameraBtn = el('camera'), pasteBtn = el('paste'),
-          thumbs = el('thumbs'), runBtn = el('run'), clearBtn = el('clear'),
-          out = el('out'), capNote = el('capNote');
+    const provider = el('provider'), model = el('model'), apiKey = el('apiKey'), baseUrl = el('baseUrl'), baseUrlBox = el('baseUrlBox');
+    const reasoningToggle = el('reasoningToggle'), effort = el('effort');
+    const remember = el('remember'), promptEl = el('prompt');
+    const file = el('file'), pickBtn = el('pick'), cameraBtn = el('camera'), pasteBtn = el('paste'), drop = el('drop'), clearImgs = el('clearImgs');
+    const thumbs = el('thumbs'), runBtn = el('run'), clearBtn = el('clear'), out = el('out'), capNote = el('capNote');
 
-    // Known model capabilities
-    const MODEL_CAPS = {
-      'gpt-4o': {vision:true, reasoning:false},
-      'gpt-4o-mini': {vision:true, reasoning:false},
-      'gpt-4.1-mini': {vision:true, reasoning:false},
-      'o3-mini': {vision:true, reasoning:true},
-      'o4-mini': {vision:true, reasoning:true}
+    // Provider → supported models + capabilities
+    const MODELS = {
+      openai: {
+        list: [
+          {id:'gpt-4o', label:'gpt-4o (vision)', reason:false},
+          {id:'gpt-4o-mini', label:'gpt-4o-mini (vision, cheap)', reason:false},
+          {id:'gpt-4.1-mini', label:'gpt-4.1-mini (vision)', reason:false},
+          {id:'o3-mini', label:'o3-mini (reasoning + vision)', reason:true},
+          {id:'o4-mini', label:'o4-mini (reasoning + vision)', reason:true},
+        ],
+        reasonNote: 'Reasoning available on o3/o4 only.'
+      },
+      google: {
+        list: [
+          {id:'gemini-1.5-flash', label:'gemini-1.5-flash (vision)', reason:false},
+          {id:'gemini-1.5-flash-8b', label:'gemini-1.5-flash-8b (vision, light)', reason:false},
+          {id:'gemini-1.5-pro', label:'gemini-1.5-pro (vision)', reason:false}
+        ],
+        reasonNote: 'Gemini does not use OpenAI reasoning parameter.'
+      },
+      anthropic: {
+        list: [
+          {id:'claude-3-5-sonnet-20241022', label:'claude-3.5-sonnet (vision)', reason:false},
+          {id:'claude-3-5-haiku-20241022', label:'claude-3.5-haiku (vision, light)', reason:false}
+        ],
+        reasonNote: 'Claude uses its own API format; no OpenAI reasoning parameter.'
+      }
     };
 
-    function refreshCaps(){
-      const caps = MODEL_CAPS[model.value] || {vision:true, reasoning:false};
-      reasoningToggle.disabled = !caps.reasoning;
-      effort.disabled = !caps.reasoning;
-      if (!caps.reasoning){ reasoningToggle.checked = false; }
-      capNote.textContent = caps.reasoning
-        ? 'Reasoning supported on this model.'
-        : 'Reasoning not supported on this model (auto-disabled).';
-    }
-    model.addEventListener('change', refreshCaps);
-    refreshCaps();
-
-    // Persist key if user opts in
-    try{
-      const saved = localStorage.getItem('vh_key');
-      if (saved){ key.value = saved; remember.checked = true; }
-    }catch{}
-    remember.addEventListener('change', ()=>{
-      try{
-        if (remember.checked) localStorage.setItem('vh_key', key.value.trim());
-        else localStorage.removeItem('vh_key');
-      }catch{}
-    });
-    key.addEventListener('input', ()=>{
-      if (remember.checked){
-        try{ localStorage.setItem('vh_key', key.value.trim()); }catch{}
+    function populateModels(){
+      model.innerHTML = '';
+      const m = MODELS[provider.value];
+      for (const it of m.list){
+        const o = document.createElement('option'); o.value = it.id; o.textContent = it.label; model.appendChild(o);
       }
+      refreshCaps();
+      baseUrlBox.style.display = provider.value === 'openai' ? 'block' : 'none';
+      // Load saved key per provider
+      try{ const saved = localStorage.getItem('vh_key_'+provider.value); apiKey.value = saved || ''; remember.checked = !!saved; }catch{}
+    }
+
+    function refreshCaps(){
+      const m = MODELS[provider.value];
+      const current = m.list.find(x => x.id === model.value) || m.list[0];
+      const canReason = provider.value === 'openai' && current.reason;
+      reasoningToggle.disabled = !canReason; effort.disabled = !canReason; if (!canReason) reasoningToggle.checked = false;
+      capNote.textContent = canReason ? 'Reasoning supported on this model.' : (m.reasonNote || '');
+    }
+
+    provider.addEventListener('change', populateModels);
+    model.addEventListener('change', refreshCaps);
+    populateModels();
+
+    // Persist key per provider
+    remember.addEventListener('change', ()=>{
+      try{ if (remember.checked) localStorage.setItem('vh_key_'+provider.value, apiKey.value.trim()); else localStorage.removeItem('vh_key_'+provider.value); }catch{}
     });
+    apiKey.addEventListener('input', ()=>{ if (remember.checked){ try{ localStorage.setItem('vh_key_'+provider.value, apiKey.value.trim()); }catch{} } });
 
     let images = [];
-    function addThumb(src){ const img=new Image(); img.src=src; img.loading='lazy'; thumbs.appendChild(img); }
-    async function filesToDataURLs(list){
-      const arr=[]; for (const f of list){
-        const url=await new Promise((res,rej)=>{
-          const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f);
-        });
-        arr.push(url);
-      }
-      return arr;
+
+    function renderThumbs(){
+      thumbs.innerHTML = '';
+      images.forEach((src, idx)=>{
+        const wrap = document.createElement('div'); wrap.className='thumb';
+        const img = new Image(); img.src = src; img.loading='lazy';
+        const btn = document.createElement('button'); btn.className='del'; btn.textContent='×';
+        btn.addEventListener('click', ()=>{ images.splice(idx,1); renderThumbs(); });
+        wrap.appendChild(img); wrap.appendChild(btn); thumbs.appendChild(wrap);
+      });
     }
 
-    // Pick from library / camera
+    function addThumbs(urls){ images.push(...urls); renderThumbs(); }
+
+    async function filesToDataURLs(list){ const arr=[]; for (const f of list){ const url=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f); }); arr.push(url);} return arr; }
+
     pickBtn.addEventListener('click', ()=>{ file.removeAttribute('capture'); file.click(); });
     cameraBtn.addEventListener('click', ()=>{ file.setAttribute('capture','environment'); file.click(); });
-    file.addEventListener('change', async (e)=>{
-      const urls=await filesToDataURLs(e.target.files);
-      images.push(...urls); urls.forEach(addThumb); file.value='';
-    });
+    file.addEventListener('change', async (e)=>{ const urls=await filesToDataURLs(e.target.files); addThumbs(urls); file.value=''; });
 
-    // Clipboard paste
     pasteBtn.addEventListener('click', async ()=>{
-      try{
-        const items = await navigator.clipboard.read();
-        for (const it of items){
-          for (const type of it.types){
-            if (type.startsWith('image/')){
-              const blob = await it.getType(type);
-              const url = await new Promise((res)=>{
-                const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(blob);
-              });
-              images.push(url); addThumb(url);
-            }
-          }
-        }
-      }catch{ alert('Clipboard read not supported here.'); }
+      try{ const items = await navigator.clipboard.read(); for (const it of items){ for (const type of it.types){ if (type.startsWith('image/')){ const blob = await it.getType(type); const url = await new Promise((res)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(blob); }); addThumbs([url]); } } } }
+      catch{ alert('Clipboard read not supported here.'); }
     });
 
-    function buildInput(){
-      const content=[]; const text=promptEl.value.trim();
-      if (text) content.push({type:'input_text', text});
-      for (const img of images) content.push({type:'input_image', image_url: img});
+    drop.addEventListener('dragover', (e)=>{ e.preventDefault(); drop.classList.add('hover'); });
+    drop.addEventListener('dragleave', ()=> drop.classList.remove('hover'));
+    drop.addEventListener('drop', async (e)=>{ e.preventDefault(); drop.classList.remove('hover'); const urls=await filesToDataURLs(e.dataTransfer.files); addThumbs(urls); });
+
+    clearImgs.addEventListener('click', ()=>{ images=[]; renderThumbs(); });
+
+    function buildOpenAIInput(){
+      const content=[]; const text=promptEl.value.trim(); if (text) content.push({type:'input_text', text});
+      for (const img of images){ content.push({type:'input_image', image_url: img}); }
       return [{role:'user', content}];
     }
 
-    function extractText(resp){
-      try{
-        const arr=resp.output||[]; let txt='';
-        for (const item of arr){
-          if (item.type==='message' && item.content){
-            for (const c of item.content){
-              if (c.type==='output_text' && typeof c.text==='string') txt+=c.text;
-              if (c.type==='text' && typeof c.text==='string') txt+=c.text;
-            }
-          }
-          if (item.type==='output_text' && typeof item.text==='string') txt+=item.text;
-        }
-        return txt.trim()||JSON.stringify(resp,null,2);
-      }catch(e){ return JSON.stringify(resp,null,2); }
+    function buildGeminiParts(){
+      const parts=[]; const text=promptEl.value.trim(); if (text) parts.push({text});
+      for (const img of images){ const m = /^data:(.*?);base64,(.*)$/.exec(img); if (m){ parts.push({inline_data:{mime_type: m[1]||'image/png', data: m[2]}}); } }
+      return parts;
     }
 
-    async function callAPI(){
-      const API_KEY = key.value.trim();
-      if (!API_KEY){ alert('Enter your OpenAI API key.'); return; }
-      if (images.length===0 && !promptEl.value.trim()){
-        alert('Add at least one image or a prompt.'); return;
+    function buildClaudeContent(){
+      const content=[]; // Claude expects array of content blocks
+      for (const img of images){
+        const m = /^data:(.*?);base64,(.*)$/.exec(img);
+        if (m){ content.push({ type:'image', source:{ type:'base64', media_type: m[1]||'image/png', data: m[2] } }); }
       }
+      const text = promptEl.value.trim(); if (text) content.push({ type:'text', text });
+      return content;
+    }
+
+    function extractOpenAI(resp){ try{ const arr=resp.output||[]; let txt=''; for (const item of arr){ if (item.type==='message' && item.content){ for (const c of item.content){ if (c.type==='output_text' && typeof c.text==='string') txt+=c.text; if (c.type==='text' && typeof c.text==='string') txt+=c.text; } } if (item.type==='output_text' && typeof item.text==='string') txt+=item.text; } return txt.trim()||JSON.stringify(resp,null,2);}catch(e){ return JSON.stringify(resp,null,2);} }
+    function extractGemini(resp){ try{ const c = resp.candidates && resp.candidates[0]; const p = c && c.content && c.content.parts; if (p && p.length){ return p.map(x=>x.text||'').join(''); } return JSON.stringify(resp,null,2);}catch(e){ return JSON.stringify(resp,null,2);} }
+    function extractClaude(resp){ try{ const t = resp && resp.content && resp.content.map(p=>p.text||'').join(''); return t || JSON.stringify(resp,null,2);}catch(e){ return JSON.stringify(resp,null,2);} }
+
+    async function callAPI(){
+      const keyVal = apiKey.value.trim(); if (!keyVal){ alert('Enter your API key.'); return; }
+      if (images.length===0 && !promptEl.value.trim()){ alert('Add at least one image or a prompt.'); return; }
       runBtn.disabled=true; out.textContent='Asking model...';
 
-      const payload = { model: model.value, input: buildInput() };
-      // Include reasoning only when supported and toggled on
-      if (!reasoningToggle.disabled && reasoningToggle.checked){
-        payload.reasoning = { effort: effort.value };
-      }
-
       try{
-        const resp = await fetch('https://api.openai.com/v1/responses',{
-          method:'POST',
-          headers:{'Content-Type':'application/json','Authorization':`Bearer ${API_KEY}`},
-          body: JSON.stringify(payload)
-        });
-        if (!resp.ok){
-          const t = await resp.text();
-          throw new Error(`HTTP ${resp.status}: ${t}`);
+        if (provider.value === 'openai'){
+          const payload = { model: model.value, input: buildOpenAIInput() };
+          const canReason = MODELS.openai.list.find(x=>x.id===model.value)?.reason;
+          if (canReason && reasoningToggle.checked){ payload.reasoning = { effort: effort.value }; }
+          const url = (baseUrl.value.trim() || 'https://api.openai.com') + '/v1/responses';
+          const resp = await fetch(url,{ method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${keyVal}`}, body: JSON.stringify(payload) });
+          if (!resp.ok){ const t=await resp.text(); throw new Error(`HTTP ${resp.status}: ${t}`); }
+          const data = await resp.json(); out.textContent = extractOpenAI(data);
         }
-        const data = await resp.json();
-        out.textContent = extractText(data);
-      }catch(err){
-        out.innerHTML = `<span class="warn">Error:</span> ${String(err.message||err)}`;
-      }finally{
-        runBtn.disabled=false;
-      }
+        else if (provider.value === 'google'){
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model.value)}:generateContent?key=${encodeURIComponent(keyVal)}`;
+          const payload = { contents: [{ role:'user', parts: buildGeminiParts() }] };
+          const resp = await fetch(url,{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+          if (!resp.ok){ const t=await resp.text(); throw new Error(`HTTP ${resp.status}: ${t}`); }
+          const data = await resp.json(); out.textContent = extractGemini(data);
+        }
+        else if (provider.value === 'anthropic'){
+          const url = 'https://api.anthropic.com/v1/messages';
+          const payload = { model: model.value, max_tokens: 1024, messages: [ { role:'user', content: buildClaudeContent() } ] };
+          const resp = await fetch(url,{ method:'POST', headers:{ 'Content-Type':'application/json', 'x-api-key': keyVal, 'anthropic-version':'2023-06-01' }, body: JSON.stringify(payload) });
+          if (!resp.ok){ const t=await resp.text(); throw new Error(`HTTP ${resp.status}: ${t}`); }
+          const data = await resp.json(); out.textContent = extractClaude(data);
+        }
+      }catch(err){ out.innerHTML = `<span class="warn">Error:</span> ${String(err.message||err)}`; }
+      finally{ runBtn.disabled=false; }
     }
 
     runBtn.addEventListener('click', callAPI);
-    clearBtn.addEventListener('click', ()=>{
-      images=[]; thumbs.innerHTML=''; out.textContent=''; promptEl.value='';
-    });
+    clearBtn.addEventListener('click', ()=>{ out.textContent=''; });
   </script>
 </body>
 </html>
