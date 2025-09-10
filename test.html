@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Vision HW Helper — Mobile</title>
+  <title>Vision HW Helper — Mobile (v2)</title>
   <style>
     :root{--bg:#0b0b10;--panel:#10141b;--ink:#eef2f6;--muted:#a6b0c2;--acc:#4da3ff;--bad:#ff5d6c}
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -34,11 +34,12 @@
     .switch{display:flex;align-items:center;gap:10px}
     .switch input{width:1.3em;height:1.3em}
     .warn{color:var(--bad)}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#101826;border:1px solid #243043;color:#b9c6d8;font-size:12px}
   </style>
 </head>
 <body>
   <header>
-    <h1>Vision HW Helper — Mobile</h1>
+    <h1>Vision HW Helper — Mobile (v2)</h1>
   </header>
   <div class="wrap">
     <div class="card">
@@ -55,9 +56,28 @@
           <div>
             <label for="model">Model</label>
             <select id="model">
+              <!-- Vision models (no reasoning param) -->
               <option value="gpt-4o" selected>gpt-4o (vision)</option>
-              <option value="gpt-4.1-mini">gpt-4.1-mini</option>
-              <option value="gpt-4o-mini">gpt-4o-mini</option>
+              <option value="gpt-4o-mini">gpt-4o-mini (vision, cheap)</option>
+              <option value="gpt-4.1-mini">gpt-4.1-mini (vision)</option>
+              <!-- Reasoning-capable models -->
+              <option value="o3-mini">o3-mini (reasoning + vision)</option>
+              <option value="o4-mini">o4-mini (reasoning + vision)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:6px">
+          <div class="switch">
+            <input id="reasoningToggle" type="checkbox" />
+            <label for="reasoningToggle" class="small">Enable reasoning effort</label>
+          </div>
+          <div>
+            <label for="effort" class="small">Reasoning effort</label>
+            <select id="effort">
+              <option value="low">low</option>
+              <option value="medium" selected>medium</option>
+              <option value="high">high</option>
             </select>
           </div>
         </div>
@@ -84,6 +104,7 @@
         <div class="actions" style="margin-top:12px">
           <button class="btn" id="run">Ask</button>
           <button class="btn secondary" id="clear">Clear</button>
+          <span class="small" id="capNote"></span>
         </div>
       </div>
       <div id="out" class="out"></div>
@@ -97,25 +118,47 @@
   <script>
     const el = (id)=>document.getElementById(id);
     const key = el('key'), remember = el('remember'), model = el('model'),
+          reasoningToggle = el('reasoningToggle'), effort = el('effort'),
           promptEl = el('prompt'), file = el('file'), pickBtn = el('pick'),
           cameraBtn = el('camera'), pasteBtn = el('paste'),
           thumbs = el('thumbs'), runBtn = el('run'), clearBtn = el('clear'),
-          out = el('out');
+          out = el('out'), capNote = el('capNote');
 
-    try {
+    // Known model capabilities
+    const MODEL_CAPS = {
+      'gpt-4o': {vision:true, reasoning:false},
+      'gpt-4o-mini': {vision:true, reasoning:false},
+      'gpt-4.1-mini': {vision:true, reasoning:false},
+      'o3-mini': {vision:true, reasoning:true},
+      'o4-mini': {vision:true, reasoning:true}
+    };
+
+    function refreshCaps(){
+      const caps = MODEL_CAPS[model.value] || {vision:true, reasoning:false};
+      reasoningToggle.disabled = !caps.reasoning;
+      effort.disabled = !caps.reasoning;
+      if (!caps.reasoning){ reasoningToggle.checked = false; }
+      capNote.textContent = caps.reasoning
+        ? 'Reasoning supported on this model.'
+        : 'Reasoning not supported on this model (auto-disabled).';
+    }
+    model.addEventListener('change', refreshCaps);
+    refreshCaps();
+
+    // Persist key if user opts in
+    try{
       const saved = localStorage.getItem('vh_key');
       if (saved){ key.value = saved; remember.checked = true; }
-    } catch {}
-
+    }catch{}
     remember.addEventListener('change', ()=>{
-      try {
+      try{
         if (remember.checked) localStorage.setItem('vh_key', key.value.trim());
         else localStorage.removeItem('vh_key');
-      } catch {}
+      }catch{}
     });
     key.addEventListener('input', ()=>{
       if (remember.checked){
-        try{ localStorage.setItem('vh_key', key.value.trim()); } catch{}
+        try{ localStorage.setItem('vh_key', key.value.trim()); }catch{}
       }
     });
 
@@ -123,41 +166,45 @@
     function addThumb(src){ const img=new Image(); img.src=src; img.loading='lazy'; thumbs.appendChild(img); }
     async function filesToDataURLs(list){
       const arr=[]; for (const f of list){
-        const dataURL=await new Promise((res,rej)=>{
+        const url=await new Promise((res,rej)=>{
           const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f);
         });
-        arr.push(dataURL);
-      } return arr;
+        arr.push(url);
+      }
+      return arr;
     }
 
+    // Pick from library / camera
     pickBtn.addEventListener('click', ()=>{ file.removeAttribute('capture'); file.click(); });
     cameraBtn.addEventListener('click', ()=>{ file.setAttribute('capture','environment'); file.click(); });
-    file.addEventListener('change', async e=>{
+    file.addEventListener('change', async (e)=>{
       const urls=await filesToDataURLs(e.target.files);
       images.push(...urls); urls.forEach(addThumb); file.value='';
     });
 
+    // Clipboard paste
     pasteBtn.addEventListener('click', async ()=>{
-      try {
+      try{
         const items = await navigator.clipboard.read();
         for (const it of items){
           for (const type of it.types){
             if (type.startsWith('image/')){
               const blob = await it.getType(type);
-              const url = await new Promise((res)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(blob); });
+              const url = await new Promise((res)=>{
+                const r=new FileReader(); r.onload=()=>res(r.result); r.readAsDataURL(blob);
+              });
               images.push(url); addThumb(url);
             }
           }
         }
-      } catch(err){ alert('Clipboard read not supported here.'); }
+      }catch{ alert('Clipboard read not supported here.'); }
     });
 
     function buildInput(){
-      const content=[];
-      const text=promptEl.value.trim();
-      if (text) content.push({ type:'input_text', text });
-      for (const img of images) content.push({ type:'input_image', image_url: img });
-      return [{ role:'user', content }];
+      const content=[]; const text=promptEl.value.trim();
+      if (text) content.push({type:'input_text', text});
+      for (const img of images) content.push({type:'input_image', image_url: img});
+      return [{role:'user', content}];
     }
 
     function extractText(resp){
@@ -178,25 +225,41 @@
 
     async function callAPI(){
       const API_KEY = key.value.trim();
-      if (!API_KEY){ alert('Enter your OpenAI API key'); return; }
-      if (images.length===0 && !promptEl.value.trim()){ alert('Add image or prompt'); return; }
+      if (!API_KEY){ alert('Enter your OpenAI API key.'); return; }
+      if (images.length===0 && !promptEl.value.trim()){
+        alert('Add at least one image or a prompt.'); return;
+      }
       runBtn.disabled=true; out.textContent='Asking model...';
-      const payload={ model:model.value, input:buildInput(), reasoning:{effort:'medium'} };
+
+      const payload = { model: model.value, input: buildInput() };
+      // Include reasoning only when supported and toggled on
+      if (!reasoningToggle.disabled && reasoningToggle.checked){
+        payload.reasoning = { effort: effort.value };
+      }
+
       try{
-        const resp=await fetch('https://api.openai.com/v1/responses',{
+        const resp = await fetch('https://api.openai.com/v1/responses',{
           method:'POST',
           headers:{'Content-Type':'application/json','Authorization':`Bearer ${API_KEY}`},
-          body:JSON.stringify(payload)
+          body: JSON.stringify(payload)
         });
-        if(!resp.ok){ const t=await resp.text(); throw new Error(`HTTP ${resp.status}: ${t}`); }
-        const data=await resp.json();
-        out.textContent=extractText(data);
-      }catch(err){ out.innerHTML=`<span class="warn">Error:</span> ${String(err.message||err)}`; }
-      finally{ runBtn.disabled=false; }
+        if (!resp.ok){
+          const t = await resp.text();
+          throw new Error(`HTTP ${resp.status}: ${t}`);
+        }
+        const data = await resp.json();
+        out.textContent = extractText(data);
+      }catch(err){
+        out.innerHTML = `<span class="warn">Error:</span> ${String(err.message||err)}`;
+      }finally{
+        runBtn.disabled=false;
+      }
     }
 
     runBtn.addEventListener('click', callAPI);
-    clearBtn.addEventListener('click', ()=>{ images=[]; thumbs.innerHTML=''; out.textContent=''; promptEl.value=''; });
+    clearBtn.addEventListener('click', ()=>{
+      images=[]; thumbs.innerHTML=''; out.textContent=''; promptEl.value='';
+    });
   </script>
 </body>
 </html>
